@@ -108,6 +108,9 @@ body {
   border-radius: 999px;
   font-weight: 600 !important;
   transition: transform 0.2s, background 0.2s;
+  min-width: 11.5em;
+  text-align: center;
+  box-sizing: border-box;
 }
 .nav-cta:hover { transform: translateY(-1px); }
 
