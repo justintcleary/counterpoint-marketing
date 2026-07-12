@@ -311,7 +311,6 @@ body {
   border-bottom: 1px solid var(--border);
   overflow: hidden;
   padding: 18px 0;
-  background: var(--bg-alt);
 }
 .marquee-track {
   display: flex;
@@ -335,9 +334,7 @@ body {
 /* ---------- Sections ---------- */
 
 .section { padding: 110px 24px; position: relative; z-index: 2; }
-.section.alt {
-  background: linear-gradient(180deg, var(--bg) 0%, var(--bg-alt) 18%, var(--bg-alt) 82%, var(--bg) 100%);
-}
+.section.alt { background: transparent; }
 
 .section-inner { max-width: 1200px; margin: 0 auto; }
 .section-inner.center { text-align: center; }
