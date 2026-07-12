@@ -243,7 +243,7 @@ body {
 /* ---------- Statement band ---------- */
 
 .statement {
-  padding: 120px 24px 110px;
+  padding: 110px 24px 32px;
   position: relative;
   z-index: 2;
   overflow: hidden;
@@ -334,7 +334,9 @@ body {
 /* ---------- Sections ---------- */
 
 .section { padding: 110px 24px; position: relative; z-index: 2; }
-.section.alt { background: var(--bg-alt); }
+.section.alt {
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg-alt) 18%, var(--bg-alt) 82%, var(--bg) 100%);
+}
 
 .section-inner { max-width: 1200px; margin: 0 auto; }
 .section-inner.center { text-align: center; }
