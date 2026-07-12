@@ -99,6 +99,7 @@ body {
   transition: color 0.2s;
 }
 .nav-links a:hover { color: var(--text); }
+.nav-links a.active { color: var(--accent); }
 
 .nav-cta {
   color: var(--bg) !important;
