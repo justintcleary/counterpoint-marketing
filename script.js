@@ -42,5 +42,18 @@ form.addEventListener("submit", (e) => {
   form.reset();
 });
 
+// Cursor glow (pointer devices only, skip if reduced motion)
+const glow = document.getElementById("cursorGlow");
+const fancyOK =
+  window.matchMedia("(pointer: fine)").matches &&
+  !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+if (glow && fancyOK) {
+  window.addEventListener("mousemove", (e) => {
+    glow.style.opacity = "1";
+    glow.style.left = e.clientX + "px";
+    glow.style.top = e.clientY + "px";
+  }, { passive: true });
+}
+
 // Footer year
 document.getElementById("year").textContent = new Date().getFullYear();

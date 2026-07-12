@@ -24,6 +24,24 @@ body {
   overflow-x: hidden;
 }
 
+::selection {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.cursor-glow {
+  position: fixed;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(circle, rgba(214, 255, 63, 0.07) 0%, transparent 60%);
+  transform: translate(-50%, -50%);
+  transition: opacity 0.3s;
+  opacity: 0;
+}
+
 .noise {
   position: fixed;
   inset: 0;
@@ -117,6 +135,35 @@ body {
   padding: 140px 24px 80px;
 }
 
+.hero-blob {
+  position: absolute;
+  width: 55vw;
+  height: 55vw;
+  max-width: 800px;
+  max-height: 800px;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.16;
+  background: radial-gradient(circle at 30% 30%, var(--accent), transparent 65%);
+  top: -12%;
+  right: -18%;
+  animation: blob-drift 16s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+.hero-blob-2 {
+  background: radial-gradient(circle at 70% 70%, var(--accent-2), transparent 65%);
+  top: auto;
+  right: auto;
+  bottom: -20%;
+  left: -15%;
+  animation-duration: 22s;
+  animation-delay: -8s;
+}
+@keyframes blob-drift {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(-6%, 8%) scale(1.15); }
+}
+
 .hero-grid {
   position: absolute;
   inset: 0;
@@ -158,6 +205,67 @@ body {
   color: var(--accent);
 }
 
+.accent-animated {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: gradient-slide 6s linear infinite;
+}
+@keyframes gradient-slide {
+  to { background-position: 200% center; }
+}
+
+.hero-chips {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 48px;
+}
+.chip {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  transition: transform 0.25s;
+}
+.chip-lime { border-color: var(--accent); color: var(--accent); transform: rotate(-2deg); }
+.chip-purple { border-color: var(--accent-2); color: var(--accent-2); transform: rotate(1.5deg); }
+.chip-ghost { transform: rotate(-0.5deg); }
+.chip:hover { transform: rotate(0deg) scale(1.06); }
+
+/* ---------- Statement band ---------- */
+
+.statement {
+  padding: 120px 24px 110px;
+  position: relative;
+  z-index: 2;
+  overflow: hidden;
+}
+.statement-line {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2.6rem, 8vw, 6rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+.statement .outline {
+  color: transparent;
+  -webkit-text-stroke: 2px var(--text);
+}
+.statement-sub {
+  margin-top: 26px;
+  color: var(--text-dim);
+  font-size: 1.15rem;
+  max-width: 560px;
+}
+
 .hero-sub {
   max-width: 620px;
   color: var(--text-dim);
@@ -183,7 +291,10 @@ body {
   background: var(--accent);
   color: var(--bg);
 }
-.btn-primary:hover { transform: translateY(-2px); }
+.btn-primary:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 0 32px rgba(214, 255, 63, 0.45);
+}
 .btn-ghost {
   border: 1px solid var(--border);
   color: var(--text);
@@ -207,11 +318,13 @@ body {
   white-space: nowrap;
   animation: scroll 30s linear infinite;
   font-family: var(--font-display);
-  font-size: 0.85rem;
+  font-size: 1.05rem;
+  font-weight: 600;
   letter-spacing: 0.16em;
   color: var(--text-dim);
   width: max-content;
 }
+.marquee:hover .marquee-track { animation-play-state: paused; }
 .marquee-track span:nth-child(even) { color: var(--accent); }
 @keyframes scroll {
   from { transform: translateX(0); }
@@ -286,8 +399,9 @@ body {
   transition: transform 0.25s, border-color 0.25s;
 }
 .card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-6px) rotate(-0.6deg);
   border-color: var(--accent);
+  box-shadow: 0 12px 40px rgba(214, 255, 63, 0.12);
 }
 .card-num {
   font-family: var(--font-display);
