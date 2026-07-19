@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 
@@ -134,7 +134,12 @@
     <div class="section-inner center">
       <p class="kicker">03 / Apply</p>
       <h2>Join the network.<br><span class="accent accent-animated">Two minutes, no strings.</span></h2>
-      <form class="contact-form" id="contactForm">
+      <form class="contact-form" id="contactForm" action="https://formsubmit.co/justin@counterpoint.marketing" method="POST">
+        <input type="hidden" name="_cc" value="bence@counterpoint.marketing">
+        <input type="hidden" name="_subject" value="Creator application - counterpoint.marketing">
+        <input type="hidden" name="_next" value="https://counterpoint.marketing/creators.html?sent=1#apply">
+        <input type="hidden" name="_captcha" value="false">
+        <input type="text" name="_honey" style="display:none" tabindex="-1" autocomplete="off">
         <div class="form-row">
           <input type="text" name="name" placeholder="Your name" required>
           <input type="email" name="email" placeholder="Email" required>
@@ -160,6 +165,6 @@
   </div>
 </footer>
 
-<script src="script.js?v=2"></script>
+<script src="script.js?v=3"></script>
 </body>
 </html>

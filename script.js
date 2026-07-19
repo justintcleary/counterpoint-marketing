@@ -32,15 +32,11 @@ document
     observer.observe(el);
   });
 
-// Contact form (no backend yet; acknowledge locally)
-const form = document.getElementById("contactForm");
+// Contact form: posts to FormSubmit; show a note when redirected back with ?sent=1
 const note = document.getElementById("formNote");
-form.addEventListener("submit", (e) => {
-  e.preventDefault();
-  note.textContent =
-    "Thanks! The form backend isn't wired up yet. Reach out directly and we'll get back to you fast.";
-  form.reset();
-});
+if (note && new URLSearchParams(window.location.search).get("sent") === "1") {
+  note.textContent = "Got it. We'll get back to you fast.";
+}
 
 // Cursor glow (pointer devices only, skip if reduced motion)
 const glow = document.getElementById("cursorGlow");
