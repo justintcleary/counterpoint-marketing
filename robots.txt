@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
 Disallow: /brand/
+Disallow: /portal/
 
 Sitemap: https://counterpoint.marketing/sitemap.xml

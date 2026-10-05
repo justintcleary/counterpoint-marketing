@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Creator Portal | counterpoint.marketing</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon.ico" sizes="32x32">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="portal.css?v=1">
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a href="../index.html" class="logo">counterpoint<span>.marketing</span></a>
+    <div class="nav-links"><a href="../creators.html">For creators</a></div>
+  </div>
+</header>
+
+<main id="main">
+  <div class="auth-wrap">
+    <div class="auth-card">
+
+      <!-- ---------------- sign in ---------------- -->
+      <section id="loginView">
+        <p class="kicker">Creator portal</p>
+        <h1>Welcome back.</h1>
+        <p class="sub">Sign in to see open campaigns and track your applications.</p>
+        <div id="loginNote" class="note hidden"></div>
+        <form id="loginForm" class="card">
+          <div class="field">
+            <label for="liEmail">Email</label>
+            <input id="liEmail" type="email" autocomplete="email" required>
+          </div>
+          <div class="field">
+            <label for="liPass">Password</label>
+            <input id="liPass" type="password" autocomplete="current-password" required>
+          </div>
+          <button class="btn btn-primary btn-wide" type="submit">Sign in</button>
+        </form>
+        <p class="switcher">New here? <button type="button" id="toSignup">Apply to join</button></p>
+      </section>
+
+      <!-- ---------------- sign up ---------------- -->
+      <section id="signupView" class="hidden">
+        <p class="kicker">Creator portal</p>
+        <h1>Apply to join.</h1>
+        <p class="sub">Tell us who you are and where you post. We review every application by hand and will email you once you are approved.</p>
+        <div id="signupNote" class="note hidden"></div>
+        <form id="signupForm" class="card">
+          <div class="field">
+            <label for="suName">Full name</label>
+            <input id="suName" type="text" required>
+          </div>
+          <div class="field">
+            <label for="suEmail">Email</label>
+            <input id="suEmail" type="email" autocomplete="email" required>
+          </div>
+          <div class="field">
+            <label for="suPass">Password</label>
+            <input id="suPass" type="password" autocomplete="new-password" minlength="8" required>
+          </div>
+          <div class="field">
+            <label for="suHandles">Your handles</label>
+            <input id="suHandles" type="text" placeholder="@you on TikTok, IG, YouTube" required>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="suSize">Audience size</label>
+              <input id="suSize" type="text" placeholder="e.g. 45K across platforms">
+            </div>
+            <div class="field">
+              <label for="suNiche">Your niche</label>
+              <input id="suNiche" type="text" placeholder="politics, health, sports...">
+            </div>
+          </div>
+          <div class="field">
+            <label for="suLocation">Location</label>
+            <input id="suLocation" type="text" placeholder="City, state">
+          </div>
+          <div class="field">
+            <label for="suNotes">Anything else we should know?</label>
+            <textarea id="suNotes" rows="3"></textarea>
+          </div>
+          <button class="btn btn-primary btn-wide" type="submit">Submit application</button>
+        </form>
+        <p class="switcher">Already have an account? <button type="button" id="toLogin">Sign in</button></p>
+      </section>
+
+      <!-- ---------------- submitted ---------------- -->
+      <section id="doneView" class="hidden">
+        <p class="kicker">Application received</p>
+        <h1>Thanks. We're on it.</h1>
+        <p class="sub">Your application is with our team. We review every creator by hand, and you will get an email as soon as you are approved. Most reviews take a couple of days.</p>
+        <a class="btn btn-ghost" href="../index.html">Back to the site</a>
+      </section>
+
+    </div>
+  </div>
+</main>
+
+<script type="module">
+import { sb, requireConfig, $, notice, clearNotice, notifyTeam, currentProfile } from "./app.js";
+
+if (requireConfig()) {
+  const loginView = $("#loginView"), signupView = $("#signupView"), doneView = $("#doneView");
+  const show = (el) => { [loginView, signupView, doneView].forEach(v => v.classList.add("hidden")); el.classList.remove("hidden"); };
+
+  $("#toSignup").addEventListener("click", () => show(signupView));
+  $("#toLogin").addEventListener("click", () => show(loginView));
+  if (location.hash === "#apply") show(signupView);
+
+  // already signed in? go straight through
+  currentProfile().then(p => { if (p) location.href = "dashboard.html"; });
+
+  // ---- sign in ----
+  $("#loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const note = $("#loginNote"); clearNotice(note);
+    const btn = e.target.querySelector("button"); btn.disabled = true; btn.textContent = "Signing in...";
+    const { error } = await sb.auth.signInWithPassword({
+      email: $("#liEmail").value.trim(), password: $("#liPass").value,
+    });
+    btn.disabled = false; btn.textContent = "Sign in";
+    if (error) { notice(note, error.message); return; }
+    location.href = "dashboard.html";
+  });
+
+  // ---- sign up ----
+  $("#signupForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const note = $("#signupNote"); clearNotice(note);
+    const btn = e.target.querySelector("button"); btn.disabled = true; btn.textContent = "Submitting...";
+
+    const payload = {
+      full_name: $("#suName").value.trim(),
+      handles: $("#suHandles").value.trim(),
+      audience_size: $("#suSize").value.trim(),
+      niche: $("#suNiche").value.trim(),
+      location: $("#suLocation").value.trim(),
+      notes: $("#suNotes").value.trim(),
+    };
+    const email = $("#suEmail").value.trim();
+
+    const { error } = await sb.auth.signUp({
+      email, password: $("#suPass").value, options: { data: payload },
+    });
+    btn.disabled = false; btn.textContent = "Submit application";
+    if (error) { notice(note, error.message); return; }
+
+    await notifyTeam("New creator application - counterpoint.marketing", {
+      name: payload.full_name, email,
+      handles: payload.handles, audience_size: payload.audience_size,
+      niche: payload.niche, location: payload.location, notes: payload.notes,
+    });
+    show(doneView);
+  });
+}
+</script>
+</body>
+</html>

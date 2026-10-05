@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin | counterpoint.marketing</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="portal.css?v=1">
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a href="../index.html" class="logo">counterpoint<span>.marketing</span></a>
+    <div class="nav-links" id="navLinks"></div>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap">
+    <p class="kicker">Admin</p>
+    <h1>Manage the portal</h1>
+    <p class="sub">Approve creators, run campaigns, and review every application in one place.</p>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="creators">Creators <span id="cntCreators" class="muted"></span></button>
+      <button class="tab" data-tab="campaigns">Campaigns</button>
+      <button class="tab" data-tab="apps">Applications <span id="cntApps" class="muted"></span></button>
+    </div>
+
+    <!-- ---------------- creators ---------------- -->
+    <section id="tab-creators">
+      <div id="creatorsBox"></div>
+    </section>
+
+    <!-- ---------------- campaigns ---------------- -->
+    <section id="tab-campaigns" class="hidden">
+      <div class="card">
+        <h2 id="formTitle">New campaign</h2>
+        <div id="campNote" class="note hidden"></div>
+        <form id="campForm">
+          <input type="hidden" id="cId">
+          <div class="field-row">
+            <div class="field"><label for="cTitle">Title</label><input id="cTitle" required></div>
+            <div class="field"><label for="cClient">Client</label><input id="cClient" placeholder="Shown to creators"></div>
+          </div>
+          <div class="field"><label for="cSummary">Short summary</label><input id="cSummary" placeholder="One line creators see on the card"></div>
+          <div class="field"><label for="cBrief">Full brief</label><textarea id="cBrief" rows="5"></textarea></div>
+          <div class="field-row">
+            <div class="field"><label for="cPlatforms">Platforms</label><input id="cPlatforms" placeholder="TikTok, Instagram, YouTube Shorts"></div>
+            <div class="field"><label for="cDeliverables">Deliverables</label><input id="cDeliverables" placeholder="1x in-feed video"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label for="cRate">Rate</label><input id="cRate" placeholder="e.g. $2,500 per video"></div>
+            <div class="field"><label for="cDeadline">Deadline</label><input id="cDeadline" type="date"></div>
+          </div>
+          <div class="field"><label for="cStatus">Status</label>
+            <select id="cStatus">
+              <option value="draft">Draft (hidden from creators)</option>
+              <option value="open">Open (visible, accepting applications)</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+          <div class="row">
+            <button class="btn btn-primary" type="submit" id="campSave">Create campaign</button>
+            <button class="btn btn-ghost hidden" type="button" id="campCancel">Cancel edit</button>
+          </div>
+        </form>
+      </div>
+      <div id="campaignsBox"></div>
+    </section>
+
+    <!-- ---------------- applications ---------------- -->
+    <section id="tab-apps" class="hidden">
+      <div id="appsBox"></div>
+    </section>
+  </div>
+</main>
+
+<script type="module">
+import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notice, clearNotice } from "./app.js";
+
+if (requireConfig()) {
+  const profile = await guard("admin");
+  if (profile) {
+    mountNav(profile, "admin");
+    await Promise.all([loadCreators(), loadCampaigns(), loadApps()]);
+
+    $$(".tab").forEach(t => t.addEventListener("click", () => {
+      $$(".tab").forEach(x => x.classList.toggle("active", x === t));
+      ["creators", "campaigns", "apps"].forEach(name =>
+        $("#tab-" + name).classList.toggle("hidden", name !== t.dataset.tab));
+    }));
+  }
+
+  /* ---------------- creators ---------------- */
+  async function loadCreators() {
+    const { data } = await sb.from("profiles").select("*")
+      .order("created_at", { ascending: false });
+    const rows = data || [];
+    const pending = rows.filter(r => r.status === "pending").length;
+    $("#cntCreators").textContent = pending ? `(${pending} pending)` : "";
+
+    $("#creatorsBox").innerHTML = rows.length === 0
+      ? `<div class="empty">No creators have signed up yet.</div>`
+      : `<div class="card tight table-wrap"><table>
+          <tr><th>Creator</th><th>Audience</th><th>Niche</th><th>Joined</th><th>Status</th><th></th></tr>
+          ${rows.map(r => `<tr>
+            <td><strong>${esc(r.full_name || "Unnamed")}</strong>${r.role === "admin" ? ' <span class="pill pill-lime">admin</span>' : ""}
+                <br><span class="muted">${esc(r.email)}</span>
+                ${r.handles ? `<br><span class="muted">${esc(r.handles)}</span>` : ""}
+                ${r.notes ? `<br><span class="muted">${esc(r.notes)}</span>` : ""}</td>
+            <td class="muted">${esc(r.audience_size || "")}<br>${esc(r.location || "")}</td>
+            <td class="muted">${esc(r.niche || "")}</td>
+            <td class="muted">${fmtDate(r.created_at)}</td>
+            <td>${statusPill(r.status)}</td>
+            <td><div class="row">
+              ${r.status !== "approved" ? `<button class="btn btn-ghost btn-sm" data-set="approved" data-id="${r.id}">Approve</button>` : ""}
+              ${r.status !== "rejected" ? `<button class="btn btn-danger btn-sm" data-set="rejected" data-id="${r.id}">Reject</button>` : ""}
+            </div></td></tr>`).join("")}
+        </table></div>`;
+
+    $$("[data-set]").forEach(b => b.addEventListener("click", async () => {
+      b.disabled = true;
+      const { error } = await sb.from("profiles")
+        .update({ status: b.dataset.set }).eq("id", b.dataset.id);
+      if (error) { alert(error.message); b.disabled = false; return; }
+      await loadCreators();
+    }));
+  }
+
+  /* ---------------- campaigns ---------------- */
+  async function loadCampaigns() {
+    const { data } = await sb.from("campaigns").select("*")
+      .order("created_at", { ascending: false });
+    const rows = data || [];
+
+    $("#campaignsBox").innerHTML = rows.length === 0
+      ? `<div class="empty">No campaigns yet. Create one above.</div>`
+      : `<div class="card tight table-wrap"><table>
+          <tr><th>Campaign</th><th>Client</th><th>Deadline</th><th>Status</th><th></th></tr>
+          ${rows.map(c => `<tr>
+            <td><strong>${esc(c.title)}</strong>${c.summary ? `<br><span class="muted">${esc(c.summary)}</span>` : ""}</td>
+            <td class="muted">${esc(c.client_name || "")}</td>
+            <td class="muted">${fmtDate(c.deadline)}</td>
+            <td>${statusPill(c.status)}</td>
+            <td><div class="row">
+              <button class="btn btn-ghost btn-sm" data-edit="${c.id}">Edit</button>
+              ${c.status !== "open" ? `<button class="btn btn-ghost btn-sm" data-cstat="open" data-id="${c.id}">Open</button>` : ""}
+              ${c.status !== "closed" ? `<button class="btn btn-ghost btn-sm" data-cstat="closed" data-id="${c.id}">Close</button>` : ""}
+              <button class="btn btn-danger btn-sm" data-del="${c.id}">Delete</button>
+            </div></td></tr>`).join("")}
+        </table></div>`;
+
+    $$("[data-cstat]").forEach(b => b.addEventListener("click", async () => {
+      b.disabled = true;
+      await sb.from("campaigns").update({ status: b.dataset.cstat }).eq("id", b.dataset.id);
+      await loadCampaigns();
+    }));
+
+    $$("[data-del]").forEach(b => b.addEventListener("click", async () => {
+      if (!confirm("Delete this campaign and all of its applications?")) return;
+      await sb.from("campaigns").delete().eq("id", b.dataset.del);
+      await Promise.all([loadCampaigns(), loadApps()]);
+    }));
+
+    $$("[data-edit]").forEach(b => b.addEventListener("click", () => {
+      const c = rows.find(x => x.id === b.dataset.edit);
+      $("#cId").value = c.id; $("#cTitle").value = c.title || "";
+      $("#cClient").value = c.client_name || ""; $("#cSummary").value = c.summary || "";
+      $("#cBrief").value = c.brief || ""; $("#cPlatforms").value = c.platforms || "";
+      $("#cDeliverables").value = c.deliverables || ""; $("#cRate").value = c.rate || "";
+      $("#cDeadline").value = c.deadline || ""; $("#cStatus").value = c.status;
+      $("#formTitle").textContent = "Edit campaign";
+      $("#campSave").textContent = "Save changes";
+      $("#campCancel").classList.remove("hidden");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }));
+  }
+
+  function resetForm() {
+    $("#campForm").reset(); $("#cId").value = "";
+    $("#formTitle").textContent = "New campaign";
+    $("#campSave").textContent = "Create campaign";
+    $("#campCancel").classList.add("hidden");
+  }
+  $("#campCancel").addEventListener("click", resetForm);
+
+  $("#campForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const note = $("#campNote"); clearNotice(note);
+    const payload = {
+      title: $("#cTitle").value.trim(), client_name: $("#cClient").value.trim(),
+      summary: $("#cSummary").value.trim(), brief: $("#cBrief").value.trim(),
+      platforms: $("#cPlatforms").value.trim(), deliverables: $("#cDeliverables").value.trim(),
+      rate: $("#cRate").value.trim(), deadline: $("#cDeadline").value || null,
+      status: $("#cStatus").value,
+    };
+    const id = $("#cId").value;
+    const { error } = id
+      ? await sb.from("campaigns").update(payload).eq("id", id)
+      : await sb.from("campaigns").insert(payload);
+    if (error) { notice(note, error.message); return; }
+    notice(note, id ? "Campaign updated." : "Campaign created.", "ok");
+    resetForm(); await loadCampaigns();
+  });
+
+  /* ---------------- applications ---------------- */
+  async function loadApps() {
+    const { data } = await sb.from("application_details").select("*")
+      .order("created_at", { ascending: false });
+    const rows = data || [];
+    const open = rows.filter(r => r.status === "submitted").length;
+    $("#cntApps").textContent = open ? `(${open} new)` : "";
+
+    $("#appsBox").innerHTML = rows.length === 0
+      ? `<div class="empty">No applications yet.</div>`
+      : `<div class="card tight table-wrap"><table>
+          <tr><th>Creator</th><th>Campaign</th><th>Pitch</th><th>Date</th><th>Status</th><th></th></tr>
+          ${rows.map(a => `<tr>
+            <td><strong>${esc(a.full_name || "")}</strong><br><span class="muted">${esc(a.email)}</span>
+                ${a.handles ? `<br><span class="muted">${esc(a.handles)}</span>` : ""}
+                ${a.audience_size ? `<br><span class="muted">${esc(a.audience_size)}</span>` : ""}</td>
+            <td>${esc(a.campaign_title)}<br><span class="muted">${esc(a.client_name || "")}</span></td>
+            <td class="muted">${esc(a.pitch || "")}</td>
+            <td class="muted">${fmtDate(a.created_at)}</td>
+            <td>${statusPill(a.status)}</td>
+            <td><div class="row">
+              ${a.status !== "accepted" ? `<button class="btn btn-ghost btn-sm" data-astat="accepted" data-id="${a.id}">Accept</button>` : ""}
+              ${a.status !== "declined" ? `<button class="btn btn-danger btn-sm" data-astat="declined" data-id="${a.id}">Decline</button>` : ""}
+            </div></td></tr>`).join("")}
+        </table></div>`;
+
+    $$("[data-astat]").forEach(b => b.addEventListener("click", async () => {
+      b.disabled = true;
+      const { error } = await sb.from("applications")
+        .update({ status: b.dataset.astat }).eq("id", b.dataset.id);
+      if (error) { alert(error.message); b.disabled = false; return; }
+      await loadApps();
+    }));
+  }
+}
+</script>
+</body>
+</html>

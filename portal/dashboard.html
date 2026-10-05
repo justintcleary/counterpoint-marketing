@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Campaigns | counterpoint.marketing</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="portal.css?v=1">
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a href="../index.html" class="logo">counterpoint<span>.marketing</span></a>
+    <div class="nav-links" id="navLinks"></div>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap">
+    <div id="pending" class="hidden">
+      <p class="kicker">Application under review</p>
+      <h1>You're on the list.</h1>
+      <p class="sub">Our team is reviewing your application. You will get an email the moment you are approved, and campaigns will show up here automatically.</p>
+      <div class="card"><h3>While you wait</h3>
+        <p class="muted">Keep posting. When we match creators to a campaign we look at how engaged your audience is, not just how big it is.</p></div>
+    </div>
+
+    <div id="rejected" class="hidden">
+      <p class="kicker">Application closed</p>
+      <h1>Not a fit right now.</h1>
+      <p class="sub">We are not able to move forward with your application at this time. Things change as new campaigns come in, so feel free to reach out at justin@counterpoint.marketing.</p>
+    </div>
+
+    <div id="approved" class="hidden">
+      <p class="kicker">Creator portal</p>
+      <h1 id="greeting">Open campaigns</h1>
+      <p class="sub">Apply to anything that fits your audience. We will follow up with rates and the full brief.</p>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="open">Open campaigns</button>
+        <button class="tab" data-tab="mine">My applications</button>
+      </div>
+
+      <section id="tab-open">
+        <div id="campaignList" class="grid"></div>
+      </section>
+
+      <section id="tab-mine" class="hidden">
+        <div id="myApps"></div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notifyTeam } from "./app.js";
+
+if (requireConfig()) {
+  const profile = await guard("any");
+  if (profile) {
+    mountNav(profile, "dashboard");
+
+    if (profile.status === "pending")  $("#pending").classList.remove("hidden");
+    else if (profile.status === "rejected") $("#rejected").classList.remove("hidden");
+    else {
+      $("#approved").classList.remove("hidden");
+      const first = (profile.full_name || "").split(" ")[0];
+      if (first) $("#greeting").textContent = `Open campaigns, ${first}`;
+      await loadCampaigns();
+
+      $$(".tab").forEach(t => t.addEventListener("click", async () => {
+        $$(".tab").forEach(x => x.classList.toggle("active", x === t));
+        $("#tab-open").classList.toggle("hidden", t.dataset.tab !== "open");
+        $("#tab-mine").classList.toggle("hidden", t.dataset.tab !== "mine");
+        if (t.dataset.tab === "mine") await loadMine();
+      }));
+    }
+  }
+
+  async function loadCampaigns() {
+    const list = $("#campaignList");
+    const [{ data: campaigns }, { data: mine }] = await Promise.all([
+      sb.from("campaigns").select("*").eq("status", "open").order("created_at", { ascending: false }),
+      sb.from("applications").select("campaign_id").eq("creator_id", profile.id),
+    ]);
+    const applied = new Set((mine || []).map(a => a.campaign_id));
+
+    if (!campaigns || campaigns.length === 0) {
+      list.outerHTML = `<div class="empty" id="campaignList">No open campaigns right now. We will email you when something new goes live.</div>`;
+      return;
+    }
+
+    list.innerHTML = campaigns.map(c => `
+      <article class="card">
+        <div class="spread">
+          <h3>${esc(c.title)}</h3>
+          ${applied.has(c.id) ? '<span class="pill pill-lime">Applied</span>' : ""}
+        </div>
+        ${c.client_name ? `<p class="muted">${esc(c.client_name)}</p>` : ""}
+        ${c.summary ? `<p style="margin:10px 0">${esc(c.summary)}</p>` : ""}
+        <div class="stack muted" style="margin:12px 0">
+          ${c.platforms ? `<div><strong>Platforms:</strong> ${esc(c.platforms)}</div>` : ""}
+          ${c.deliverables ? `<div><strong>Deliverables:</strong> ${esc(c.deliverables)}</div>` : ""}
+          ${c.rate ? `<div><strong>Rate:</strong> ${esc(c.rate)}</div>` : ""}
+          <div><strong>Deadline:</strong> ${fmtDate(c.deadline)}</div>
+        </div>
+        ${c.brief ? `<details style="margin-bottom:14px"><summary class="muted" style="cursor:pointer">Full brief</summary>
+           <p style="margin-top:10px;white-space:pre-wrap">${esc(c.brief)}</p></details>` : ""}
+        ${applied.has(c.id)
+          ? `<button class="btn btn-ghost btn-sm" disabled>Application submitted</button>`
+          : `<button class="btn btn-primary btn-sm" data-apply="${c.id}" data-title="${esc(c.title)}">Apply</button>`}
+        <div class="apply-box hidden" id="apply-${c.id}" style="margin-top:14px">
+          <div class="field">
+            <label for="pitch-${c.id}">Why you, for this one?</label>
+            <textarea id="pitch-${c.id}" rows="3" placeholder="A sentence or two about your audience and the angle you would take."></textarea>
+          </div>
+          <button class="btn btn-primary btn-sm" data-send="${c.id}">Submit application</button>
+        </div>
+      </article>`).join("");
+
+    $$("[data-apply]").forEach(b => b.addEventListener("click", () => {
+      $("#apply-" + b.dataset.apply).classList.remove("hidden");
+      b.classList.add("hidden");
+    }));
+
+    $$("[data-send]").forEach(b => b.addEventListener("click", async () => {
+      const id = b.dataset.send;
+      b.disabled = true; b.textContent = "Submitting...";
+      const pitch = $("#pitch-" + id).value.trim();
+      const { error } = await sb.from("applications")
+        .insert({ campaign_id: id, creator_id: profile.id, pitch });
+      if (error) { b.disabled = false; b.textContent = "Submit application"; alert(error.message); return; }
+
+      const campaign = campaigns.find(c => c.id === id);
+      await notifyTeam("New campaign application - counterpoint.marketing", {
+        campaign: campaign?.title || id, client: campaign?.client_name || "",
+        creator: profile.full_name, email: profile.email,
+        handles: profile.handles, audience_size: profile.audience_size,
+        niche: profile.niche, pitch,
+      });
+      await loadCampaigns();
+    }));
+  }
+
+  async function loadMine() {
+    const box = $("#myApps");
+    const { data } = await sb.from("applications")
+      .select("id,status,pitch,created_at,campaigns(title,client_name)")
+      .eq("creator_id", profile.id).order("created_at", { ascending: false });
+
+    if (!data || data.length === 0) {
+      box.innerHTML = `<div class="empty">You have not applied to anything yet.</div>`;
+      return;
+    }
+    box.innerHTML = `<div class="card tight table-wrap"><table>
+      <tr><th>Campaign</th><th>Client</th><th>Applied</th><th>Status</th></tr>
+      ${data.map(a => `<tr>
+        <td><strong>${esc(a.campaigns?.title || "")}</strong>${a.pitch ? `<br><span class="muted">${esc(a.pitch)}</span>` : ""}</td>
+        <td class="muted">${esc(a.campaigns?.client_name || "")}</td>
+        <td class="muted">${fmtDate(a.created_at)}</td>
+        <td>${statusPill(a.status)}</td>
+      </tr>`).join("")}
+    </table></div>`;
+  }
+}
+</script>
+</body>
+</html>
