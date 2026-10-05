@@ -1,39 +1,49 @@
 -- =====================================================================
 -- counterpoint.marketing creator portal
--- Run this once in Supabase: Dashboard > SQL Editor > New query > Run
+-- Run this in Supabase: Dashboard > SQL Editor > New query > Run.
+-- Safe to re-run: every statement is idempotent.
 -- =====================================================================
 
 -- ---------- Tables ----------------------------------------------------
 
 create table if not exists public.profiles (
-  id             uuid primary key references auth.users on delete cascade,
-  email          text not null,
-  full_name      text,
-  handles        text,
-  audience_size  text,
-  niche          text,
-  location       text,
-  notes          text,
-  status         text not null default 'pending'
-                 check (status in ('pending','approved','rejected')),
-  role           text not null default 'creator'
-                 check (role in ('creator','admin')),
-  created_at     timestamptz not null default now()
+  id                uuid primary key references auth.users on delete cascade,
+  email             text not null,
+  full_name         text,
+  handles           text,
+  audience_size     text,
+  niche             text,
+  location          text,
+  age               int,
+  gender            text,
+  political_leaning text,
+  notes             text,
+  status            text not null default 'pending'
+                    check (status in ('pending','approved','rejected')),
+  role              text not null default 'creator'
+                    check (role in ('creator','admin')),
+  created_at        timestamptz not null default now()
 );
 
 create table if not exists public.campaigns (
-  id            uuid primary key default gen_random_uuid(),
-  title         text not null,
-  client_name   text,
-  summary       text,
-  brief         text,
-  platforms     text,
-  deliverables  text,
-  rate          text,
-  deadline      date,
-  status        text not null default 'draft'
-                check (status in ('draft','open','closed')),
-  created_at    timestamptz not null default now()
+  id              uuid primary key default gen_random_uuid(),
+  title           text not null,
+  client_name     text,
+  summary         text,
+  brief           text,
+  platforms       text,
+  deliverables    text,
+  rate            text,
+  deadline        date,
+  target_gender   text default 'any',
+  target_age_min  int,
+  target_age_max  int,
+  target_leaning  text default 'any',
+  target_location text,
+  target_niche    text,
+  status          text not null default 'draft'
+                  check (status in ('draft','open','closed')),
+  created_at      timestamptz not null default now()
 );
 
 create table if not exists public.applications (
@@ -49,6 +59,49 @@ create table if not exists public.applications (
 
 create index if not exists applications_campaign_idx on public.applications(campaign_id);
 create index if not exists applications_creator_idx  on public.applications(creator_id);
+
+-- ---------- Migrations for projects created before demographics -------
+
+alter table public.profiles  add column if not exists age               int;
+alter table public.profiles  add column if not exists gender            text;
+alter table public.profiles  add column if not exists political_leaning text;
+
+alter table public.campaigns add column if not exists target_gender   text default 'any';
+alter table public.campaigns add column if not exists target_age_min  int;
+alter table public.campaigns add column if not exists target_age_max  int;
+alter table public.campaigns add column if not exists target_leaning  text default 'any';
+alter table public.campaigns add column if not exists target_location text;
+alter table public.campaigns add column if not exists target_niche    text;
+
+-- Controlled vocabularies. Creators may always decline to answer, so the
+-- columns stay nullable and carry an explicit "prefer not to say" value.
+alter table public.profiles drop constraint if exists profiles_gender_check;
+alter table public.profiles add  constraint profiles_gender_check
+  check (gender is null or gender in
+    ('woman','man','non-binary','other','prefer not to say'));
+
+alter table public.profiles drop constraint if exists profiles_leaning_check;
+alter table public.profiles add  constraint profiles_leaning_check
+  check (political_leaning is null or political_leaning in
+    ('left','lean left','moderate','lean right','right','non-political','prefer not to say'));
+
+alter table public.profiles drop constraint if exists profiles_age_check;
+alter table public.profiles add  constraint profiles_age_check
+  check (age is null or (age >= 16 and age <= 100));
+
+alter table public.campaigns drop constraint if exists campaigns_target_gender_check;
+alter table public.campaigns add  constraint campaigns_target_gender_check
+  check (target_gender is null or target_gender in
+    ('any','woman','man','non-binary'));
+
+alter table public.campaigns drop constraint if exists campaigns_target_leaning_check;
+alter table public.campaigns add  constraint campaigns_target_leaning_check
+  check (target_leaning is null or target_leaning in
+    ('any','left','lean left','moderate','lean right','right','non-political'));
+
+create index if not exists profiles_age_idx     on public.profiles(age);
+create index if not exists profiles_gender_idx  on public.profiles(gender);
+create index if not exists profiles_leaning_idx on public.profiles(political_leaning);
 
 -- ---------- Helper functions (security definer avoids RLS recursion) ---
 
@@ -72,7 +125,9 @@ create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer
 set search_path = public as $$
 begin
-  insert into public.profiles (id, email, full_name, handles, audience_size, niche, location, notes)
+  insert into public.profiles (
+    id, email, full_name, handles, audience_size, niche, location,
+    age, gender, political_leaning, notes)
   values (
     new.id,
     new.email,
@@ -81,6 +136,9 @@ begin
     new.raw_user_meta_data->>'audience_size',
     new.raw_user_meta_data->>'niche',
     new.raw_user_meta_data->>'location',
+    nullif(new.raw_user_meta_data->>'age','')::int,
+    nullif(new.raw_user_meta_data->>'gender',''),
+    nullif(new.raw_user_meta_data->>'political_leaning',''),
     new.raw_user_meta_data->>'notes'
   )
   on conflict (id) do nothing;
@@ -144,11 +202,13 @@ create policy applications_admin_all on public.applications
 
 -- ---------- Admin view: applications joined to people and campaigns ----
 
-create or replace view public.application_details
+drop view if exists public.application_details;
+create view public.application_details
 with (security_invoker = true) as
   select a.id, a.status, a.pitch, a.created_at,
          c.id as campaign_id, c.title as campaign_title, c.client_name,
-         p.id as creator_id, p.full_name, p.email, p.handles, p.audience_size, p.niche
+         p.id as creator_id, p.full_name, p.email, p.handles, p.audience_size,
+         p.niche, p.location, p.age, p.gender, p.political_leaning
   from public.applications a
   join public.campaigns c on c.id = a.campaign_id
   join public.profiles  p on p.id = a.creator_id;

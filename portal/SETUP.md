@@ -1,41 +1,32 @@
 # Creator portal setup
 
-Three steps, about 15 minutes total. You only do this once.
+The Supabase project is already created and connected. This file records what
+was done, and what is left for you.
 
-## 1. Create the Supabase project
+## What is already live
 
-1. Go to supabase.com and sign up (free tier is fine).
-2. Create a new project. Pick any name, set a database password, choose a US region.
-3. Wait for it to finish provisioning (about two minutes).
+- **Supabase project:** `counterpoint-portal`, East US, free tier, under the
+  `counterpoint.marketing` organization.
+- **Database:** `supabase/schema.sql` has been run. Tables are `profiles`,
+  `campaigns` and `applications`, all with row level security enabled.
+- **Connection:** `portal/config.js` holds the project URL and the publishable
+  key. That key is meant to be public. Row level security is what protects the
+  data. The **secret** key is not in this repo and must never be.
+- **Auth > URL Configuration:** Site URL is `https://counterpoint.marketing/portal/`
+  with `https://counterpoint.marketing/portal/**` allowed as a redirect.
+- **Auth > Sign In / Providers:** "Confirm email" is **off**. Supabase's built in
+  mailer only allows a couple of messages per hour, so leaving it on would make
+  most signups fail silently. Admin approval is the real gate: a new account can
+  see nothing until you approve it. If you later want verified email addresses,
+  add a real SMTP provider under Authentication > Emails and turn confirmation
+  back on.
 
-## 2. Create the database
+## Left to do
 
-1. In Supabase, open **SQL Editor** in the left sidebar.
-2. Click **New query**.
-3. Open `supabase/schema.sql` from this repo, copy the whole file, paste it in, click **Run**.
-
-You should see "Success. No rows returned."
-
-## 3. Connect the portal
-
-1. In Supabase go to **Project Settings > Data API**.
-2. Copy the **Project URL** and the **anon public** key.
-3. Open `portal/config.js` and paste them in:
-
-```js
-export const SUPABASE_URL = "https://xxxxxxxx.supabase.co";
-export const SUPABASE_ANON_KEY = "eyJhbGci...";
-```
-
-The anon key is meant to be public. Row level security in the schema is what
-protects the data. Never paste the `service_role` key anywhere in this repo.
-
-4. Commit and push. The portal goes live at counterpoint.marketing/portal/
-
-## 4. Make yourself an admin
+### 1. Make yourselves admins
 
 1. Go to counterpoint.marketing/portal/ and sign up with your work email.
-2. Back in the Supabase SQL editor, run:
+2. In the Supabase SQL editor, run:
 
 ```sql
 update public.profiles set role = 'admin', status = 'approved'
@@ -45,11 +36,11 @@ update public.profiles set role = 'admin', status = 'approved'
 where email = 'bence@counterpoint.marketing';
 ```
 
-(Bence has to sign up first before that second line will match anything.)
+(Bence has to sign up first before that second line matches anything.)
 
 Reload the portal and an **Admin** link appears in the top nav.
 
-## 5. Turn on email notifications
+### 2. Turn on email notifications
 
 New signups and campaign applications are emailed to bence@counterpoint.marketing
 through FormSubmit. The very first message triggers a one time confirmation:
@@ -61,22 +52,42 @@ through FormSubmit. The very first message triggers a one time confirmation:
 Until that link is clicked, notifications are held, not delivered. Everything
 still saves to the database either way, so nothing is lost.
 
-## Settings worth checking in Supabase
-
-- **Authentication > Providers > Email**: confirm "Confirm email" is ON so people
-  verify their address. Supabase sends those emails for you.
-- **Authentication > URL Configuration**: set Site URL to
-  `https://counterpoint.marketing/portal/` so confirmation links come back to the
-  right place.
-
 ## How it works
 
 - `portal/index.html` is sign in and apply.
 - `portal/dashboard.html` is what creators see. Pending creators see a holding
-  page, approved creators see open campaigns and can apply.
+  page, approved creators see open campaigns, their applications, and their own
+  profile.
 - `portal/admin.html` is approvals, campaign management, and applications.
   It is only reachable by accounts with `role = 'admin'`.
 
 Campaigns have three states. **Draft** is invisible to creators, **open** is
 visible and accepting applications, **closed** is hidden again. Nothing is shown
 to a creator until you set it to open.
+
+## Demographics and campaign targeting
+
+Creators give their age, location, gender and political leaning at signup, and
+can change any of it later under **My profile**. Every one of those fields is
+optional, and "prefer not to say" is an explicit choice.
+
+Campaigns carry the matching target fields: gender, age range, leaning, location
+and niche. Creators see them as tags on the campaign card ("men, 20-40, lean
+right, Michigan"), and a campaign that fits them is flagged **matches you** and
+sorted to the top. Targeting never hides a campaign. Any approved creator can
+still apply to anything, which keeps the tags useful as guidance rather than a
+filter that quietly shrinks your applicant pool.
+
+On the admin side:
+
+- The **Creators** tab filters your roster by search text, status, gender,
+  leaning and age range, with a running count of how many match.
+- **Find matches** on any campaign row jumps to the Creators tab with that
+  campaign's targeting already filled into the filters, narrowed to approved
+  creators.
+- A blank filter means "do not filter on this", so creators who declined to
+  answer a question are only excluded when you actively filter on it.
+
+If you add or rename a value, change it in three places: the check constraints
+in `supabase/schema.sql`, and the `GENDERS` / `LEANINGS` lists in
+`portal/app.js`. They have to agree or saving will fail.

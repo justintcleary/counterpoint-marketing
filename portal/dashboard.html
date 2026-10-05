@@ -8,7 +8,7 @@
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=1">
+<link rel="stylesheet" href="portal.css?v=2">
 </head>
 <body>
 
@@ -43,6 +43,14 @@
       <div class="tabs">
         <button class="tab active" data-tab="open">Open campaigns</button>
         <button class="tab" data-tab="mine">My applications</button>
+        <button class="tab" data-tab="profile">My profile</button>
+      </div>
+
+      <div id="profilePrompt" class="note note-warn hidden">
+        <strong>Finish your profile.</strong> Clients brief us on the audience they need
+        to reach. Add your age, location and leaning under
+        <button type="button" class="linkish" id="goProfile">My profile</button>
+        so we can match you to the right campaigns.
       </div>
 
       <section id="tab-open">
@@ -52,12 +60,63 @@
       <section id="tab-mine" class="hidden">
         <div id="myApps"></div>
       </section>
+
+      <section id="tab-profile" class="hidden">
+        <div id="profileNote" class="note hidden"></div>
+        <form id="profileForm" class="card">
+          <p class="muted" style="margin-bottom:16px">This is what we match against when a campaign comes in. Answer only what you are comfortable sharing.</p>
+          <div class="field">
+            <label for="pfName">Full name</label>
+            <input id="pfName" type="text" required>
+          </div>
+          <div class="field">
+            <label for="pfHandles">Your handles</label>
+            <input id="pfHandles" type="text" placeholder="@you on TikTok, IG, YouTube">
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="pfSize">Audience size</label>
+              <input id="pfSize" type="text" placeholder="e.g. 45K across platforms">
+            </div>
+            <div class="field">
+              <label for="pfNiche">Your niche</label>
+              <input id="pfNiche" type="text" placeholder="politics, health, sports...">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="pfLocation">Location</label>
+              <input id="pfLocation" type="text" placeholder="City, state">
+            </div>
+            <div class="field">
+              <label for="pfAge">Age</label>
+              <input id="pfAge" type="number" min="16" max="100">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="pfGender">Gender</label>
+              <select id="pfGender"><option value="">Select</option></select>
+            </div>
+            <div class="field">
+              <label for="pfLeaning">Political leaning</label>
+              <select id="pfLeaning"><option value="">Select</option></select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="pfNotes">Anything else we should know?</label>
+            <textarea id="pfNotes" rows="3"></textarea>
+          </div>
+          <button class="btn btn-primary btn-sm" type="submit">Save profile</button>
+        </form>
+      </section>
     </div>
   </div>
 </main>
 
 <script type="module">
-import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notifyTeam } from "./app.js";
+import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notifyTeam, notice,
+         GENDERS, LEANINGS, optionList, targetChips, matchesTarget } from "./app.js?v=2";
 
 if (requireConfig()) {
   const profile = await guard("any");
@@ -72,12 +131,23 @@ if (requireConfig()) {
       if (first) $("#greeting").textContent = `Open campaigns, ${first}`;
       await loadCampaigns();
 
+      fillProfileForm();
+      if (!profile.age || !profile.gender || !profile.political_leaning || !profile.location) {
+        $("#profilePrompt").classList.remove("hidden");
+      }
+
+      const openTab = (name) => {
+        $$(".tab").forEach(x => x.classList.toggle("active", x.dataset.tab === name));
+        $("#tab-open").classList.toggle("hidden", name !== "open");
+        $("#tab-mine").classList.toggle("hidden", name !== "mine");
+        $("#tab-profile").classList.toggle("hidden", name !== "profile");
+      };
+
       $$(".tab").forEach(t => t.addEventListener("click", async () => {
-        $$(".tab").forEach(x => x.classList.toggle("active", x === t));
-        $("#tab-open").classList.toggle("hidden", t.dataset.tab !== "open");
-        $("#tab-mine").classList.toggle("hidden", t.dataset.tab !== "mine");
+        openTab(t.dataset.tab);
         if (t.dataset.tab === "mine") await loadMine();
       }));
+      $("#goProfile").addEventListener("click", () => openTab("profile"));
     }
   }
 
@@ -88,6 +158,10 @@ if (requireConfig()) {
       sb.from("applications").select("campaign_id").eq("creator_id", profile.id),
     ]);
     const applied = new Set((mine || []).map(a => a.campaign_id));
+
+    // Best fits first. Nothing is hidden: creators can apply to anything.
+    (campaigns || []).sort((a, b) =>
+      Number(matchesTarget(b, profile)) - Number(matchesTarget(a, profile)));
 
     if (!campaigns || campaigns.length === 0) {
       list.outerHTML = `<div class="empty" id="campaignList">No open campaigns right now. We will email you when something new goes live.</div>`;
@@ -102,6 +176,10 @@ if (requireConfig()) {
         </div>
         ${c.client_name ? `<p class="muted">${esc(c.client_name)}</p>` : ""}
         ${c.summary ? `<p style="margin:10px 0">${esc(c.summary)}</p>` : ""}
+        <div class="tags">
+          <span class="tags-label">Looking for</span>${targetChips(c)}
+          ${matchesTarget(c, profile) ? '<span class="tag tag-match">matches you</span>' : ""}
+        </div>
         <div class="stack muted" style="margin:12px 0">
           ${c.platforms ? `<div><strong>Platforms:</strong> ${esc(c.platforms)}</div>` : ""}
           ${c.deliverables ? `<div><strong>Deliverables:</strong> ${esc(c.deliverables)}</div>` : ""}
@@ -144,6 +222,45 @@ if (requireConfig()) {
       });
       await loadCampaigns();
     }));
+  }
+
+  function fillProfileForm() {
+    $("#pfGender").innerHTML += optionList(GENDERS, profile.gender);
+    $("#pfLeaning").innerHTML += optionList(LEANINGS, profile.political_leaning);
+    $("#pfName").value = profile.full_name || "";
+    $("#pfHandles").value = profile.handles || "";
+    $("#pfSize").value = profile.audience_size || "";
+    $("#pfNiche").value = profile.niche || "";
+    $("#pfLocation").value = profile.location || "";
+    $("#pfAge").value = profile.age || "";
+    $("#pfNotes").value = profile.notes || "";
+
+    $("#profileForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const note = $("#profileNote");
+      const btn = e.target.querySelector("button");
+      btn.disabled = true; btn.textContent = "Saving...";
+
+      const patch = {
+        full_name: $("#pfName").value.trim(),
+        handles: $("#pfHandles").value.trim(),
+        audience_size: $("#pfSize").value.trim(),
+        niche: $("#pfNiche").value.trim(),
+        location: $("#pfLocation").value.trim(),
+        age: $("#pfAge").value ? Number($("#pfAge").value) : null,
+        gender: $("#pfGender").value || null,
+        political_leaning: $("#pfLeaning").value || null,
+        notes: $("#pfNotes").value.trim(),
+      };
+      const { error } = await sb.from("profiles").update(patch).eq("id", profile.id);
+      btn.disabled = false; btn.textContent = "Save profile";
+      if (error) { notice(note, error.message); return; }
+
+      Object.assign(profile, patch);
+      notice(note, "Profile saved.", "ok");
+      $("#profilePrompt").classList.add("hidden");
+      await loadCampaigns();
+    });
   }
 
   async function loadMine() {

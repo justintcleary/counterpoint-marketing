@@ -96,8 +96,38 @@ tr:last-child td{border-bottom:none}
 .switcher{text-align:center;margin-top:18px;font-size:.9rem;color:var(--dim)}
 .switcher button{background:none;border:none;color:var(--lime);cursor:pointer;font-family:var(--font-body);font-size:.9rem;font-weight:600}
 
+/* ---------- demographic tags and filters ---------- */
+.tags{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:12px 0}
+.tags-label{font-family:var(--font-display);font-size:.68rem;font-weight:600;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--dim);margin-right:2px}
+.tag{display:inline-block;font-size:.76rem;padding:4px 10px;border-radius:999px;
+  border:1px solid var(--border);background:var(--surface2);color:var(--dim);white-space:nowrap}
+.tag-match{color:var(--lime);border-color:rgba(214,255,63,.5)}
+.faint{color:#6d6d7d}
+.fieldset-note{font-size:.84rem;color:var(--dim);margin:0 0 14px;line-height:1.5}
+.linkish{background:none;border:none;padding:0;color:var(--lime);cursor:pointer;
+  font-family:var(--font-body);font-size:inherit;font-weight:600;text-decoration:underline}
+
+.filters{margin-bottom:18px}
+.filters .field-row{grid-template-columns:repeat(4,1fr)}
+.filters .field-row:first-child{grid-template-columns:2fr 1fr}
+
+.targeting{border:1px solid var(--border);border-radius:12px;padding:16px 16px 4px;margin:0 0 14px}
+.targeting legend{font-family:var(--font-display);font-size:.8rem;font-weight:600;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--dim);padding:0 8px}
+.targeting .field-row{grid-template-columns:repeat(3,1fr)}
+
+@media (max-width:860px){
+  .filters .field-row,
+  .filters .field-row:first-child,
+  .targeting .field-row{grid-template-columns:1fr 1fr}
+}
+
 @media (max-width:620px){
-  .field-row{grid-template-columns:1fr}
+  .field-row,
+  .filters .field-row,
+  .filters .field-row:first-child,
+  .targeting .field-row{grid-template-columns:1fr}
   .wrap{padding:28px 18px 60px}
   .nav-inner{padding:12px 18px}
 }

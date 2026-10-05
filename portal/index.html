@@ -9,7 +9,7 @@
 <link rel="icon" href="../favicon.ico" sizes="32x32">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=1">
+<link rel="stylesheet" href="portal.css?v=2">
 </head>
 <body>
 
@@ -81,6 +81,21 @@
             <label for="suLocation">Location</label>
             <input id="suLocation" type="text" placeholder="City, state">
           </div>
+          <p class="fieldset-note">Clients brief us on the audience they need to reach, so this is how we match you to the right campaigns. Answer only what you are comfortable sharing.</p>
+          <div class="field-row">
+            <div class="field">
+              <label for="suAge">Age</label>
+              <input id="suAge" type="number" min="16" max="100" placeholder="e.g. 24">
+            </div>
+            <div class="field">
+              <label for="suGender">Gender</label>
+              <select id="suGender"><option value="">Select</option></select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="suLeaning">Political leaning</label>
+            <select id="suLeaning"><option value="">Select</option></select>
+          </div>
           <div class="field">
             <label for="suNotes">Anything else we should know?</label>
             <textarea id="suNotes" rows="3"></textarea>
@@ -103,11 +118,15 @@
 </main>
 
 <script type="module">
-import { sb, requireConfig, $, notice, clearNotice, notifyTeam, currentProfile } from "./app.js";
+import { sb, requireConfig, $, notice, clearNotice, notifyTeam, currentProfile,
+         GENDERS, LEANINGS, optionList } from "./app.js?v=2";
 
 if (requireConfig()) {
   const loginView = $("#loginView"), signupView = $("#signupView"), doneView = $("#doneView");
   const show = (el) => { [loginView, signupView, doneView].forEach(v => v.classList.add("hidden")); el.classList.remove("hidden"); };
+
+  $("#suGender").innerHTML += optionList(GENDERS);
+  $("#suLeaning").innerHTML += optionList(LEANINGS);
 
   $("#toSignup").addEventListener("click", () => show(signupView));
   $("#toLogin").addEventListener("click", () => show(loginView));
@@ -141,6 +160,9 @@ if (requireConfig()) {
       audience_size: $("#suSize").value.trim(),
       niche: $("#suNiche").value.trim(),
       location: $("#suLocation").value.trim(),
+      age: $("#suAge").value.trim(),
+      gender: $("#suGender").value,
+      political_leaning: $("#suLeaning").value,
       notes: $("#suNotes").value.trim(),
     };
     const email = $("#suEmail").value.trim();
@@ -154,7 +176,9 @@ if (requireConfig()) {
     await notifyTeam("New creator application - counterpoint.marketing", {
       name: payload.full_name, email,
       handles: payload.handles, audience_size: payload.audience_size,
-      niche: payload.niche, location: payload.location, notes: payload.notes,
+      niche: payload.niche, location: payload.location,
+      age: payload.age, gender: payload.gender,
+      political_leaning: payload.political_leaning, notes: payload.notes,
     });
     show(doneView);
   });

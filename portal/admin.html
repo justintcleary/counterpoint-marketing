@@ -8,7 +8,7 @@
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=1">
+<link rel="stylesheet" href="portal.css?v=2">
 </head>
 <body>
 
@@ -33,6 +33,45 @@
 
     <!-- ---------------- creators ---------------- -->
     <section id="tab-creators">
+      <div class="card tight filters">
+        <div class="field-row">
+          <div class="field">
+            <label for="fQ">Search</label>
+            <input id="fQ" type="search" placeholder="Name, email, handle, niche, location">
+          </div>
+          <div class="field">
+            <label for="fStatus">Status</label>
+            <select id="fStatus">
+              <option value="">All</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="fGender">Gender</label>
+            <select id="fGender"><option value="">Any</option></select>
+          </div>
+          <div class="field">
+            <label for="fLeaning">Political leaning</label>
+            <select id="fLeaning"><option value="">Any</option></select>
+          </div>
+          <div class="field">
+            <label for="fAgeMin">Age from</label>
+            <input id="fAgeMin" type="number" min="16" max="100">
+          </div>
+          <div class="field">
+            <label for="fAgeMax">Age to</label>
+            <input id="fAgeMax" type="number" min="16" max="100">
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn btn-ghost btn-sm" type="button" id="fClear">Clear filters</button>
+          <span class="muted" id="fCount"></span>
+        </div>
+      </div>
       <div id="creatorsBox"></div>
     </section>
 
@@ -57,6 +96,20 @@
             <div class="field"><label for="cRate">Rate</label><input id="cRate" placeholder="e.g. $2,500 per video"></div>
             <div class="field"><label for="cDeadline">Deadline</label><input id="cDeadline" type="date"></div>
           </div>
+          <fieldset class="targeting">
+            <legend>Who this campaign is for</legend>
+            <p class="muted" style="margin:0 0 12px">Creators see these as tags on the campaign card, and you can filter your roster by the same fields.</p>
+            <div class="field-row">
+              <div class="field"><label for="cTGender">Gender</label><select id="cTGender"></select></div>
+              <div class="field"><label for="cTAgeMin">Age from</label><input id="cTAgeMin" type="number" min="16" max="100"></div>
+              <div class="field"><label for="cTAgeMax">Age to</label><input id="cTAgeMax" type="number" min="16" max="100"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label for="cTLeaning">Political leaning</label><select id="cTLeaning"></select></div>
+              <div class="field"><label for="cTLocation">Location</label><input id="cTLocation" placeholder="Michigan, or nationwide"></div>
+              <div class="field"><label for="cTNiche">Niche</label><input id="cTNiche" placeholder="politics, health, sports..."></div>
+            </div>
+          </fieldset>
           <div class="field"><label for="cStatus">Status</label>
             <select id="cStatus">
               <option value="draft">Draft (hidden from creators)</option>
@@ -81,12 +134,29 @@
 </main>
 
 <script type="module">
-import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notice, clearNotice } from "./app.js";
+import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notice, clearNotice,
+         GENDERS, LEANINGS, TARGET_GENDERS, TARGET_LEANINGS, optionList,
+         targetChips } from "./app.js?v=2";
 
 if (requireConfig()) {
+  let creatorRows = [];
   const profile = await guard("admin");
   if (profile) {
     mountNav(profile, "admin");
+
+    $("#fGender").innerHTML += optionList(GENDERS);
+    $("#fLeaning").innerHTML += optionList(LEANINGS);
+    $("#cTGender").innerHTML = optionList(TARGET_GENDERS, "any");
+    $("#cTLeaning").innerHTML = optionList(TARGET_LEANINGS, "any");
+
+    ["fQ", "fStatus", "fGender", "fLeaning", "fAgeMin", "fAgeMax"].forEach(id =>
+      $("#" + id).addEventListener("input", renderCreators));
+    $("#fClear").addEventListener("click", () => {
+      ["fQ", "fStatus", "fGender", "fLeaning", "fAgeMin", "fAgeMax"]
+        .forEach(id => { $("#" + id).value = ""; });
+      renderCreators();
+    });
+
     await Promise.all([loadCreators(), loadCampaigns(), loadApps()]);
 
     $$(".tab").forEach(t => t.addEventListener("click", () => {
@@ -100,21 +170,61 @@ if (requireConfig()) {
   async function loadCreators() {
     const { data } = await sb.from("profiles").select("*")
       .order("created_at", { ascending: false });
-    const rows = data || [];
-    const pending = rows.filter(r => r.status === "pending").length;
+    creatorRows = data || [];
+    const pending = creatorRows.filter(r => r.status === "pending").length;
     $("#cntCreators").textContent = pending ? `(${pending} pending)` : "";
+    renderCreators();
+  }
 
-    $("#creatorsBox").innerHTML = rows.length === 0
+  // Blank filter means "do not filter on this", so a creator who declined to
+  // answer is only excluded when you actively filter on that field.
+  function filteredCreators() {
+    const q = $("#fQ").value.trim().toLowerCase();
+    const status = $("#fStatus").value;
+    const gender = $("#fGender").value;
+    const leaning = $("#fLeaning").value;
+    const ageMin = Number($("#fAgeMin").value) || null;
+    const ageMax = Number($("#fAgeMax").value) || null;
+
+    return creatorRows.filter(r => {
+      if (status && r.status !== status) return false;
+      if (gender && r.gender !== gender) return false;
+      if (leaning && r.political_leaning !== leaning) return false;
+      if (ageMin && !(r.age >= ageMin)) return false;
+      if (ageMax && !(r.age <= ageMax)) return false;
+      if (q) {
+        const hay = [r.full_name, r.email, r.handles, r.niche, r.location, r.notes]
+          .filter(Boolean).join(" ").toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderCreators() {
+    const rows = filteredCreators();
+    $("#fCount").textContent = creatorRows.length
+      ? `Showing ${rows.length} of ${creatorRows.length} creators`
+      : "";
+
+    $("#creatorsBox").innerHTML = creatorRows.length === 0
       ? `<div class="empty">No creators have signed up yet.</div>`
+      : rows.length === 0
+      ? `<div class="empty">No creators match these filters.</div>`
       : `<div class="card tight table-wrap"><table>
-          <tr><th>Creator</th><th>Audience</th><th>Niche</th><th>Joined</th><th>Status</th><th></th></tr>
+          <tr><th>Creator</th><th>Audience</th><th>Demographics</th><th>Joined</th><th>Status</th><th></th></tr>
           ${rows.map(r => `<tr>
             <td><strong>${esc(r.full_name || "Unnamed")}</strong>${r.role === "admin" ? ' <span class="pill pill-lime">admin</span>' : ""}
                 <br><span class="muted">${esc(r.email)}</span>
                 ${r.handles ? `<br><span class="muted">${esc(r.handles)}</span>` : ""}
                 ${r.notes ? `<br><span class="muted">${esc(r.notes)}</span>` : ""}</td>
-            <td class="muted">${esc(r.audience_size || "")}<br>${esc(r.location || "")}</td>
-            <td class="muted">${esc(r.niche || "")}</td>
+            <td class="muted">${esc(r.audience_size || "")}${r.niche ? `<br>${esc(r.niche)}` : ""}</td>
+            <td class="muted">
+              ${r.age ? `${r.age}` : '<span class="faint">age not given</span>'}
+              ${r.gender ? `<br>${esc(r.gender)}` : ""}
+              ${r.political_leaning ? `<br>${esc(r.political_leaning)}` : ""}
+              ${r.location ? `<br>${esc(r.location)}` : ""}
+            </td>
             <td class="muted">${fmtDate(r.created_at)}</td>
             <td>${statusPill(r.status)}</td>
             <td><div class="row">
@@ -141,13 +251,15 @@ if (requireConfig()) {
     $("#campaignsBox").innerHTML = rows.length === 0
       ? `<div class="empty">No campaigns yet. Create one above.</div>`
       : `<div class="card tight table-wrap"><table>
-          <tr><th>Campaign</th><th>Client</th><th>Deadline</th><th>Status</th><th></th></tr>
+          <tr><th>Campaign</th><th>Client</th><th>Looking for</th><th>Deadline</th><th>Status</th><th></th></tr>
           ${rows.map(c => `<tr>
             <td><strong>${esc(c.title)}</strong>${c.summary ? `<br><span class="muted">${esc(c.summary)}</span>` : ""}</td>
             <td class="muted">${esc(c.client_name || "")}</td>
+            <td><div class="tags">${targetChips(c)}</div></td>
             <td class="muted">${fmtDate(c.deadline)}</td>
             <td>${statusPill(c.status)}</td>
             <td><div class="row">
+              <button class="btn btn-ghost btn-sm" data-match="${c.id}">Find matches</button>
               <button class="btn btn-ghost btn-sm" data-edit="${c.id}">Edit</button>
               ${c.status !== "open" ? `<button class="btn btn-ghost btn-sm" data-cstat="open" data-id="${c.id}">Open</button>` : ""}
               ${c.status !== "closed" ? `<button class="btn btn-ghost btn-sm" data-cstat="closed" data-id="${c.id}">Close</button>` : ""}
@@ -167,6 +279,22 @@ if (requireConfig()) {
       await Promise.all([loadCampaigns(), loadApps()]);
     }));
 
+    // Carry a campaign's targeting over to the creator filters.
+    $$("[data-match]").forEach(b => b.addEventListener("click", () => {
+      const c = rows.find(x => x.id === b.dataset.match);
+      $("#fQ").value = "";
+      $("#fStatus").value = "approved";
+      $("#fGender").value = c.target_gender && c.target_gender !== "any" ? c.target_gender : "";
+      $("#fLeaning").value = c.target_leaning && c.target_leaning !== "any" ? c.target_leaning : "";
+      $("#fAgeMin").value = c.target_age_min || "";
+      $("#fAgeMax").value = c.target_age_max || "";
+      renderCreators();
+      $$(".tab").forEach(x => x.classList.toggle("active", x.dataset.tab === "creators"));
+      ["creators", "campaigns", "apps"].forEach(name =>
+        $("#tab-" + name).classList.toggle("hidden", name !== "creators"));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }));
+
     $$("[data-edit]").forEach(b => b.addEventListener("click", () => {
       const c = rows.find(x => x.id === b.dataset.edit);
       $("#cId").value = c.id; $("#cTitle").value = c.title || "";
@@ -174,6 +302,12 @@ if (requireConfig()) {
       $("#cBrief").value = c.brief || ""; $("#cPlatforms").value = c.platforms || "";
       $("#cDeliverables").value = c.deliverables || ""; $("#cRate").value = c.rate || "";
       $("#cDeadline").value = c.deadline || ""; $("#cStatus").value = c.status;
+      $("#cTGender").value = c.target_gender || "any";
+      $("#cTAgeMin").value = c.target_age_min || "";
+      $("#cTAgeMax").value = c.target_age_max || "";
+      $("#cTLeaning").value = c.target_leaning || "any";
+      $("#cTLocation").value = c.target_location || "";
+      $("#cTNiche").value = c.target_niche || "";
       $("#formTitle").textContent = "Edit campaign";
       $("#campSave").textContent = "Save changes";
       $("#campCancel").classList.remove("hidden");
@@ -183,6 +317,7 @@ if (requireConfig()) {
 
   function resetForm() {
     $("#campForm").reset(); $("#cId").value = "";
+    $("#cTGender").value = "any"; $("#cTLeaning").value = "any";
     $("#formTitle").textContent = "New campaign";
     $("#campSave").textContent = "Create campaign";
     $("#campCancel").classList.add("hidden");
@@ -197,6 +332,12 @@ if (requireConfig()) {
       summary: $("#cSummary").value.trim(), brief: $("#cBrief").value.trim(),
       platforms: $("#cPlatforms").value.trim(), deliverables: $("#cDeliverables").value.trim(),
       rate: $("#cRate").value.trim(), deadline: $("#cDeadline").value || null,
+      target_gender: $("#cTGender").value,
+      target_age_min: $("#cTAgeMin").value ? Number($("#cTAgeMin").value) : null,
+      target_age_max: $("#cTAgeMax").value ? Number($("#cTAgeMax").value) : null,
+      target_leaning: $("#cTLeaning").value,
+      target_location: $("#cTLocation").value.trim(),
+      target_niche: $("#cTNiche").value.trim(),
       status: $("#cStatus").value,
     };
     const id = $("#cId").value;
@@ -223,7 +364,8 @@ if (requireConfig()) {
           ${rows.map(a => `<tr>
             <td><strong>${esc(a.full_name || "")}</strong><br><span class="muted">${esc(a.email)}</span>
                 ${a.handles ? `<br><span class="muted">${esc(a.handles)}</span>` : ""}
-                ${a.audience_size ? `<br><span class="muted">${esc(a.audience_size)}</span>` : ""}</td>
+                ${a.audience_size ? `<br><span class="muted">${esc(a.audience_size)}</span>` : ""}
+                <br><span class="muted">${esc([a.age, a.gender, a.political_leaning, a.location].filter(Boolean).join(" / "))}</span></td>
             <td>${esc(a.campaign_title)}<br><span class="muted">${esc(a.client_name || "")}</span></td>
             <td class="muted">${esc(a.pitch || "")}</td>
             <td class="muted">${fmtDate(a.created_at)}</td>

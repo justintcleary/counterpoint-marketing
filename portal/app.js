@@ -1,5 +1,5 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-import { SUPABASE_URL, SUPABASE_ANON_KEY, NOTIFY_EMAIL } from "./config.js";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, NOTIFY_EMAIL } from "./config.js?v=2";
 
 export const configured =
   SUPABASE_URL.startsWith("http") && !SUPABASE_ANON_KEY.startsWith("YOUR_");
@@ -124,4 +124,64 @@ export async function notifyTeam(subject, fields) {
     // Never block the user's action on a notification failure.
     console.warn("Notification failed", err);
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* demographics vocabulary (must match the checks in schema.sql)       */
+/* ------------------------------------------------------------------ */
+
+export const GENDERS = ["woman", "man", "non-binary", "other", "prefer not to say"];
+
+export const LEANINGS = [
+  "left", "lean left", "moderate", "lean right", "right",
+  "non-political", "prefer not to say",
+];
+
+// Campaign targeting uses the same words minus the opt-outs, plus "any".
+export const TARGET_GENDERS = ["any", "woman", "man", "non-binary"];
+export const TARGET_LEANINGS = [
+  "any", "left", "lean left", "moderate", "lean right", "right", "non-political",
+];
+
+export function optionList(values, selected) {
+  return values
+    .map((v) => `<option value="${esc(v)}"${v === selected ? " selected" : ""}>${esc(v)}</option>`)
+    .join("");
+}
+
+// Plain-language age range, e.g. "20-40", "40+", "under 25".
+export function ageRangeLabel(min, max) {
+  if (min && max) return `${min}-${max}`;
+  if (min) return `${min}+`;
+  if (max) return `under ${max}`;
+  return "";
+}
+
+// The chips shown under a campaign title: who this campaign is looking for.
+export function targetChips(campaign) {
+  const bits = [];
+  const g = campaign.target_gender;
+  if (g && g !== "any") bits.push(g === "woman" ? "women" : g === "man" ? "men" : g);
+  const age = ageRangeLabel(campaign.target_age_min, campaign.target_age_max);
+  if (age) bits.push(age);
+  if (campaign.target_leaning && campaign.target_leaning !== "any") {
+    bits.push(campaign.target_leaning);
+  }
+  if (campaign.target_location) bits.push(campaign.target_location);
+  if (campaign.target_niche) bits.push(campaign.target_niche);
+  if (!bits.length) bits.push("open to everyone");
+  return bits.map((b) => `<span class="tag">${esc(b)}</span>`).join("");
+}
+
+// Does this creator match what the campaign is asking for? Used to sort
+// campaigns, never to hide them: creators can still apply to anything.
+export function matchesTarget(campaign, profile) {
+  if (!profile) return false;
+  const g = campaign.target_gender;
+  if (g && g !== "any" && profile.gender && profile.gender !== g) return false;
+  if (campaign.target_age_min && profile.age && profile.age < campaign.target_age_min) return false;
+  if (campaign.target_age_max && profile.age && profile.age > campaign.target_age_max) return false;
+  const l = campaign.target_leaning;
+  if (l && l !== "any" && profile.political_leaning && profile.political_leaning !== l) return false;
+  return true;
 }
