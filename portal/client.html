@@ -8,7 +8,7 @@
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=3">
+<link rel="stylesheet" href="portal.css?v=4">
 </head>
 <body>
 
@@ -122,7 +122,7 @@
 <script type="module">
 import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notice, clearNotice,
          notifyTeam, GENDERS, LEANINGS, TARGET_GENDERS, TARGET_LEANINGS, optionList,
-         targetChips, stagePill, progressBar, progressOf, campaignStatusLabel } from "./app.js?v=3";
+         targetChips, stagePill, progressBar, progressOf, campaignStatusLabel, handleLinks } from "./app.js?v=4";
 
 if (requireConfig()) {
   const profile = await guard("client");
@@ -239,7 +239,7 @@ if (requireConfig()) {
                   ${statusPill(a.status)}
                 </div>
                 <div class="muted">${esc([a.audience_size, a.niche, a.location, a.age, a.gender, a.political_leaning].filter(Boolean).join(" / "))}</div>
-                ${a.handles ? `<div class="muted">${esc(a.handles)}</div>` : ""}
+                ${handleLinks(a)}
                 ${a.pitch ? `<div style="margin-top:4px">${esc(a.pitch)}</div>` : ""}
               </div>`).join("")}
           </div>
@@ -367,7 +367,8 @@ if (requireConfig()) {
           <div class="content-item">
             <div>
               <h4>${esc(i.title || "Deliverable")}</h4>
-              <div class="muted">${esc(i.creator_name || "")}${i.creator_handles ? ` · ${esc(i.creator_handles)}` : ""}</div>
+              <div class="muted">${esc(i.creator_name || "")}</div>
+              ${handleLinks({ ...i, handles: i.creator_handles })}
               ${i.platform ? `<div class="muted">${esc(i.platform)}</div>` : ""}
             </div>
             <div>

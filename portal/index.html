@@ -9,7 +9,7 @@
 <link rel="icon" href="../favicon.ico" sizes="32x32">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=3">
+<link rel="stylesheet" href="portal.css?v=4">
 </head>
 <body>
 
@@ -72,9 +72,18 @@
             <input id="suPass" type="password" autocomplete="new-password" minlength="8" required>
           </div>
           <div class="only-creator">
+          <p class="fieldset-note">Where do you post? Handle or profile link, at least one.</p>
+          <div class="field-row">
+            <div class="field"><label for="suTiktok">TikTok</label><input id="suTiktok" type="text" placeholder="@you"></div>
+            <div class="field"><label for="suInstagram">Instagram</label><input id="suInstagram" type="text" placeholder="@you"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label for="suYoutube">YouTube</label><input id="suYoutube" type="text" placeholder="@you"></div>
+            <div class="field"><label for="suX">X</label><input id="suX" type="text" placeholder="@you"></div>
+          </div>
           <div class="field">
-            <label for="suHandles">Your handles</label>
-            <input id="suHandles" type="text" placeholder="@you on TikTok, IG, YouTube" required>
+            <label for="suHandles">Other platforms</label>
+            <input id="suHandles" type="text" placeholder="Twitch, Substack, Facebook...">
           </div>
           <div class="field-row">
             <div class="field">
@@ -129,7 +138,7 @@
 
 <script type="module">
 import { sb, requireConfig, $, $$, notice, clearNotice, notifyTeam, currentProfile, homeFor,
-         GENDERS, LEANINGS, optionList } from "./app.js?v=3";
+         GENDERS, LEANINGS, optionList, cleanHandle, hasAnyHandle, handleText } from "./app.js?v=4";
 
 if (requireConfig()) {
   const loginView = $("#loginView"), signupView = $("#signupView"), doneView = $("#doneView");
@@ -145,7 +154,6 @@ if (requireConfig()) {
     $$("#accountType button").forEach(b => b.classList.toggle("active", b.dataset.type === type));
     $$(".only-creator").forEach(el => el.classList.toggle("hidden", type !== "creator"));
     $$(".only-client").forEach(el => el.classList.toggle("hidden", type !== "client"));
-    $("#suHandles").required = type === "creator";
     $("#suCompany").required = type === "client";
     $("#signupView h1").textContent = type === "client" ? "Brief us on a campaign." : "Apply to join.";
     $("#signupView .sub").textContent = type === "client"
@@ -186,6 +194,10 @@ if (requireConfig()) {
       company: accountType === "client" ? $("#suCompany").value.trim() : "",
       full_name: $("#suName").value.trim(),
       handles: $("#suHandles").value.trim(),
+      tiktok_handle: cleanHandle($("#suTiktok").value),
+      instagram_handle: cleanHandle($("#suInstagram").value),
+      youtube_handle: cleanHandle($("#suYoutube").value),
+      x_handle: cleanHandle($("#suX").value),
       audience_size: $("#suSize").value.trim(),
       niche: $("#suNiche").value.trim(),
       location: $("#suLocation").value.trim(),
@@ -195,6 +207,10 @@ if (requireConfig()) {
       notes: $("#suNotes").value.trim(),
     };
     const email = $("#suEmail").value.trim();
+    if (accountType === "creator" && !hasAnyHandle(payload)) {
+      btn.disabled = false; btn.textContent = "Submit application";
+      notice(note, "Add at least one handle so we can find your work."); return;
+    }
 
     const { error } = await sb.auth.signUp({
       email, password: $("#suPass").value, options: { data: payload },
@@ -207,7 +223,7 @@ if (requireConfig()) {
         : "New creator application - counterpoint.marketing", {
       account_type: accountType, organization: payload.company,
       name: payload.full_name, email,
-      handles: payload.handles, audience_size: payload.audience_size,
+      handles: handleText(payload), audience_size: payload.audience_size,
       niche: payload.niche, location: payload.location,
       age: payload.age, gender: payload.gender,
       political_leaning: payload.political_leaning, notes: payload.notes,

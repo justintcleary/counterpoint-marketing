@@ -166,3 +166,6 @@ tr:last-child td{border-bottom:none}
   .wrap{padding:28px 18px 60px}
   .nav-inner{padding:12px 18px}
 }
+.tags-tight{margin:4px 0 0}
+.tag-link{color:var(--text);text-decoration:none}
+.tag-link:hover{border-color:var(--lime);color:var(--lime)}

@@ -245,3 +245,52 @@ export function campaignStatusLabel(status) {
     draft: "Draft", review: "With counterpoint", open: "Live with creators", closed: "Closed",
   }[status] || status;
 }
+
+/* ------------------------------------------------------------------ */
+/* social handles, one column per platform                            */
+/* ------------------------------------------------------------------ */
+
+export const PLATFORMS = [
+  { key: "tiktok_handle",    label: "TikTok",    url: (h) => `https://www.tiktok.com/@${h}` },
+  { key: "instagram_handle", label: "Instagram", url: (h) => `https://www.instagram.com/${h}` },
+  { key: "youtube_handle",   label: "YouTube",   url: (h) => `https://www.youtube.com/@${h}` },
+  { key: "x_handle",         label: "X",         url: (h) => `https://x.com/${h}` },
+];
+
+// "@name", "name", or a pasted profile URL all become "name".
+export function cleanHandle(value) {
+  let v = String(value || "").trim();
+  if (!v) return null;
+  if (v.includes("/")) {
+    try {
+      const url = new URL(/^https?:\/\//i.test(v) ? v : "https://" + v);
+      const parts = url.pathname.split("/").filter(Boolean);
+      // Prefer an @segment, otherwise the first segment that is not a
+      // platform prefix like youtube.com/c/… or youtube.com/user/…
+      v = parts.find((x) => x.startsWith("@"))
+        || parts.find((x) => !["c", "channel", "user", "profile"].includes(x.toLowerCase()))
+        || "";
+    } catch { /* leave as typed */ }
+  }
+  v = v.replace(/^@+/, "").replace(/[?#].*$/, "").trim();
+  return v || null;
+}
+
+export function hasAnyHandle(obj) {
+  return PLATFORMS.some((p) => obj[p.key]) || !!obj.handles;
+}
+
+// Linked chips, one per platform, plus any free-text "other" handles.
+export function handleLinks(obj) {
+  const chips = PLATFORMS.filter((p) => obj[p.key]).map((p) =>
+    `<a class="tag tag-link" href="${esc(p.url(obj[p.key]))}" target="_blank" rel="noopener">${p.label} @${esc(obj[p.key])}</a>`);
+  if (obj.handles) chips.push(`<span class="tag">${esc(obj.handles)}</span>`);
+  return chips.length ? `<div class="tags tags-tight">${chips.join("")}</div>` : "";
+}
+
+// Plain text for notification emails.
+export function handleText(obj) {
+  const bits = PLATFORMS.filter((p) => obj[p.key]).map((p) => `${p.label} @${obj[p.key]}`);
+  if (obj.handles) bits.push(obj.handles);
+  return bits.join(", ");
+}

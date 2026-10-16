@@ -8,7 +8,7 @@
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=3">
+<link rel="stylesheet" href="portal.css?v=4">
 </head>
 <body>
 
@@ -75,9 +75,17 @@
             <label for="pfName">Full name</label>
             <input id="pfName" type="text" required>
           </div>
+          <div class="field-row">
+            <div class="field"><label for="pfTiktok">TikTok</label><input id="pfTiktok" type="text" placeholder="@you"></div>
+            <div class="field"><label for="pfInstagram">Instagram</label><input id="pfInstagram" type="text" placeholder="@you"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label for="pfYoutube">YouTube</label><input id="pfYoutube" type="text" placeholder="@you"></div>
+            <div class="field"><label for="pfX">X</label><input id="pfX" type="text" placeholder="@you"></div>
+          </div>
           <div class="field">
-            <label for="pfHandles">Your handles</label>
-            <input id="pfHandles" type="text" placeholder="@you on TikTok, IG, YouTube">
+            <label for="pfHandles">Other platforms</label>
+            <input id="pfHandles" type="text" placeholder="Twitch, Substack, Facebook...">
           </div>
           <div class="field-row">
             <div class="field">
@@ -123,7 +131,7 @@
 <script type="module">
 import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notifyTeam, notice,
          GENDERS, LEANINGS, optionList, targetChips, matchesTarget,
-         STAGES, stagePill } from "./app.js?v=3";
+         STAGES, stagePill, cleanHandle, handleText } from "./app.js?v=4";
 
 if (requireConfig()) {
   const profile = await guard("creator");
@@ -227,7 +235,7 @@ if (requireConfig()) {
       await notifyTeam("New campaign application - counterpoint.marketing", {
         campaign: campaign?.title || id, client: campaign?.client_name || "",
         creator: profile.full_name, email: profile.email,
-        handles: profile.handles, audience_size: profile.audience_size,
+        handles: handleText(profile), audience_size: profile.audience_size,
         niche: profile.niche, pitch,
       });
       await loadCampaigns();
@@ -299,6 +307,10 @@ if (requireConfig()) {
     $("#pfLeaning").innerHTML += optionList(LEANINGS, profile.political_leaning);
     $("#pfName").value = profile.full_name || "";
     $("#pfHandles").value = profile.handles || "";
+    $("#pfTiktok").value = profile.tiktok_handle || "";
+    $("#pfInstagram").value = profile.instagram_handle || "";
+    $("#pfYoutube").value = profile.youtube_handle || "";
+    $("#pfX").value = profile.x_handle || "";
     $("#pfSize").value = profile.audience_size || "";
     $("#pfNiche").value = profile.niche || "";
     $("#pfLocation").value = profile.location || "";
@@ -314,6 +326,10 @@ if (requireConfig()) {
       const patch = {
         full_name: $("#pfName").value.trim(),
         handles: $("#pfHandles").value.trim(),
+        tiktok_handle: cleanHandle($("#pfTiktok").value),
+        instagram_handle: cleanHandle($("#pfInstagram").value),
+        youtube_handle: cleanHandle($("#pfYoutube").value),
+        x_handle: cleanHandle($("#pfX").value),
         audience_size: $("#pfSize").value.trim(),
         niche: $("#pfNiche").value.trim(),
         location: $("#pfLocation").value.trim(),

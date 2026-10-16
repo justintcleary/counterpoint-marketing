@@ -8,7 +8,7 @@
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=3">
+<link rel="stylesheet" href="portal.css?v=4">
 </head>
 <body>
 
@@ -158,7 +158,7 @@
 <script type="module">
 import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notice, clearNotice,
          GENDERS, LEANINGS, TARGET_GENDERS, TARGET_LEANINGS, optionList, targetChips,
-         STAGES, stagePill, progressBar, progressOf } from "./app.js?v=3";
+         STAGES, stagePill, progressBar, progressOf, handleLinks } from "./app.js?v=4";
 
 if (requireConfig()) {
   let people = [], orgs = [], campaigns = [], content = [];
@@ -215,7 +215,7 @@ if (requireConfig()) {
       if (ageMin && !(r.age >= ageMin)) return false;
       if (ageMax && !(r.age <= ageMax)) return false;
       if (q) {
-        const hay = [r.full_name, r.email, r.handles, r.niche, r.location, r.notes].filter(Boolean).join(" ").toLowerCase();
+        const hay = [r.full_name, r.email, r.handles, r.tiktok_handle, r.instagram_handle, r.youtube_handle, r.x_handle, r.niche, r.location, r.notes].filter(Boolean).join(" ").toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -237,8 +237,8 @@ if (requireConfig()) {
           ${rows.map(r => `<tr>
             <td><strong>${esc(r.full_name || "Unnamed")}</strong>${r.role === "admin" ? ' <span class="pill pill-lime">admin</span>' : ""}
                 <br><span class="muted">${esc(r.email)}</span>
-                ${r.handles ? `<br><span class="muted">${esc(r.handles)}</span>` : ""}
-                ${r.notes ? `<br><span class="muted">${esc(r.notes)}</span>` : ""}</td>
+                ${handleLinks(r)}
+                ${r.notes ? `<span class="muted">${esc(r.notes)}</span>` : ""}</td>
             <td class="muted">${esc(r.audience_size || "")}${r.niche ? `<br>${esc(r.niche)}` : ""}</td>
             <td class="muted">
               ${r.age ? `${r.age}` : '<span class="faint">age not given</span>'}
@@ -436,8 +436,8 @@ if (requireConfig()) {
           <tr><th>Creator</th><th>Campaign</th><th>Pitch</th><th>Date</th><th>Status</th><th></th></tr>
           ${rows.map(a => `<tr>
             <td><strong>${esc(a.full_name || "")}</strong><br><span class="muted">${esc(a.email)}</span>
-                ${a.handles ? `<br><span class="muted">${esc(a.handles)}</span>` : ""}
-                ${a.audience_size ? `<br><span class="muted">${esc(a.audience_size)}</span>` : ""}
+                ${handleLinks(a)}
+                ${a.audience_size ? `<span class="muted">${esc(a.audience_size)}</span>` : ""}
                 <br><span class="muted">${esc([a.age, a.gender, a.political_leaning, a.location].filter(Boolean).join(" / "))}</span></td>
             <td>${esc(a.campaign_title)}<br><span class="muted">${esc(a.client_name || "")}</span></td>
             <td class="muted">${esc(a.pitch || "")}</td>
@@ -490,7 +490,8 @@ if (requireConfig()) {
           <div class="content-item">
             <div>
               <div class="field"><label>Deliverable</label><input id="t-${i.id}" value="${esc(i.title || "")}"></div>
-              <div class="muted">${esc(i.creator_name || "")}${i.creator_handles ? ` · ${esc(i.creator_handles)}` : ""}</div>
+              <div class="muted">${esc(i.creator_name || "")}</div>
+              ${handleLinks({ ...i, handles: i.creator_handles })}
             </div>
             <div>
               <div class="field"><label>Stage</label><select id="s-${i.id}">${optionList(STAGES, i.stage)}</select></div>

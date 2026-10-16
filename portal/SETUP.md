@@ -114,6 +114,16 @@ That is enforced in the database, not just hidden in the page: clients have no
 read access to `profiles` at all and go through the `creator_directory`,
 `client_application_details` and `content_details` views instead.
 
+## Social handles
+
+Handles are stored one column per platform: `tiktok_handle`,
+`instagram_handle`, `youtube_handle`, `x_handle`, plus the free-text `handles`
+column for anything else (Twitch, Substack, and so on). Creators can paste
+"@name", "name" or a full profile URL and it is normalized to the bare name.
+Everywhere handles are shown they render as links to the profile. Accounts
+created before this change still have their original text in the "other"
+field; creators can move it into the right boxes under My profile.
+
 ## Demographics and campaign targeting
 
 Creators give their age, location, gender and political leaning at signup, and

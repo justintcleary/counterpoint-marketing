@@ -21,7 +21,11 @@ create table if not exists public.profiles (
   id                uuid primary key references auth.users on delete cascade,
   email             text not null,
   full_name         text,
-  handles           text,
+  handles           text,          -- other platforms, free text
+  tiktok_handle     text,
+  instagram_handle  text,
+  youtube_handle    text,
+  x_handle          text,
   audience_size     text,
   niche             text,
   location          text,
@@ -94,6 +98,10 @@ alter table public.profiles   add column if not exists age               int;
 alter table public.profiles   add column if not exists gender            text;
 alter table public.profiles   add column if not exists political_leaning text;
 alter table public.profiles   add column if not exists client_id         uuid references public.clients on delete set null;
+alter table public.profiles   add column if not exists tiktok_handle     text;
+alter table public.profiles   add column if not exists instagram_handle  text;
+alter table public.profiles   add column if not exists youtube_handle    text;
+alter table public.profiles   add column if not exists x_handle          text;
 
 alter table public.campaigns  add column if not exists target_gender   text default 'any';
 alter table public.campaigns  add column if not exists target_age_min  int;
@@ -205,13 +213,19 @@ begin
   end if;
 
   insert into public.profiles (
-    id, email, full_name, handles, audience_size, niche, location,
+    id, email, full_name, handles,
+    tiktok_handle, instagram_handle, youtube_handle, x_handle,
+    audience_size, niche, location,
     age, gender, political_leaning, notes, role, client_id)
   values (
     new.id,
     new.email,
     new.raw_user_meta_data->>'full_name',
     new.raw_user_meta_data->>'handles',
+    nullif(new.raw_user_meta_data->>'tiktok_handle',''),
+    nullif(new.raw_user_meta_data->>'instagram_handle',''),
+    nullif(new.raw_user_meta_data->>'youtube_handle',''),
+    nullif(new.raw_user_meta_data->>'x_handle',''),
     new.raw_user_meta_data->>'audience_size',
     new.raw_user_meta_data->>'niche',
     new.raw_user_meta_data->>'location',
@@ -395,8 +409,9 @@ create view public.application_details
 with (security_invoker = true) as
   select a.id, a.status, a.pitch, a.created_at,
          c.id as campaign_id, c.title as campaign_title, c.client_name,
-         p.id as creator_id, p.full_name, p.email, p.handles, p.audience_size,
-         p.niche, p.location, p.age, p.gender, p.political_leaning
+         p.id as creator_id, p.full_name, p.email, p.handles,
+         p.tiktok_handle, p.instagram_handle, p.youtube_handle, p.x_handle,
+         p.audience_size, p.niche, p.location, p.age, p.gender, p.political_leaning
   from public.applications a
   join public.campaigns c on c.id = a.campaign_id
   join public.profiles  p on p.id = a.creator_id;
@@ -418,7 +433,11 @@ with (security_invoker = false) as
          c.id as campaign_id, c.title as campaign_title,
          p.id as creator_id, p.full_name, p.audience_size, p.niche,
          p.location, p.age, p.gender, p.political_leaning,
-         case when a.status = 'accepted' then p.handles else null end as handles
+         case when a.status = 'accepted' then p.handles          else null end as handles,
+         case when a.status = 'accepted' then p.tiktok_handle    else null end as tiktok_handle,
+         case when a.status = 'accepted' then p.instagram_handle else null end as instagram_handle,
+         case when a.status = 'accepted' then p.youtube_handle   else null end as youtube_handle,
+         case when a.status = 'accepted' then p.x_handle         else null end as x_handle
   from public.applications a
   join public.campaigns c on c.id = a.campaign_id
   join public.profiles  p on p.id = a.creator_id
@@ -430,7 +449,8 @@ with (security_invoker = false) as
   select ci.id, ci.campaign_id, ci.creator_id, ci.title, ci.platform,
          ci.stage, ci.due_date, ci.post_url, ci.notes, ci.updated_at, ci.created_at,
          c.title as campaign_title, c.client_id,
-         p.full_name as creator_name, p.handles as creator_handles
+         p.full_name as creator_name, p.handles as creator_handles,
+         p.tiktok_handle, p.instagram_handle, p.youtube_handle, p.x_handle
   from public.content_items ci
   join public.campaigns c on c.id = ci.campaign_id
   join public.profiles  p on p.id = ci.creator_id
