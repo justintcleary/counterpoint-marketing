@@ -342,7 +342,7 @@ export function creatorModal(p, { applications = [], content = [], showEmail = f
     ${handleLinks(p) || '<p class="faint">No handles on file.</p>'}
     <div class="kv-grid">
       ${row("Audience", esc(p.audience_size || ""))}
-      ${row("Niche", esc(p.niche || ""))}
+      ${row("Interests", interestChips(p, "tag-interest"))}
       ${row("Demographics", demo.length ? demo.map(esc).join(" · ") : "")}
       ${row("Joined", p.created_at ? fmtDate(p.created_at) : "")}
       ${row("Notes", p.notes ? `<span style="white-space:pre-wrap">${esc(p.notes)}</span>` : "")}
@@ -370,4 +370,80 @@ export function creatorModal(p, { applications = [], content = [], showEmail = f
 // [data-person] clicks once, via delegation, so re-rendering is free.
 export function nameLink(id, name) {
   return `<button type="button" class="namelink" data-person="${esc(id)}">${esc(name || "Unnamed")}</button>`;
+}
+
+/* ------------------------------------------------------------------ */
+/* interests: up to five tags per creator                             */
+/* ------------------------------------------------------------------ */
+
+export const MAX_INTERESTS = 5;
+
+export const INTEREST_SUGGESTIONS = [
+  "politics", "news", "lifestyle", "fashion", "beauty", "fitness", "health",
+  "food", "travel", "parenting", "family", "finance", "business", "tech",
+  "gaming", "sports", "music", "comedy", "education", "faith", "outdoors",
+  "cars", "home", "pets", "art", "books", "college", "military", "small business",
+];
+
+export function cleanInterest(value) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ").slice(0, 30);
+}
+
+export function interestChips(obj, cls = "") {
+  const tags = Array.isArray(obj.interests) ? obj.interests : [];
+  if (tags.length) {
+    return `<div class="tags tags-tight">${tags.map((t) => `<span class="tag ${cls}">${esc(t)}</span>`).join("")}</div>`;
+  }
+  return obj.niche ? `<span class="muted">${esc(obj.niche)}</span>` : "";
+}
+
+// A chip-style tag editor. Type and press Enter or comma, or click a
+// suggestion. Returns { get() } for reading the current tags.
+export function mountTagInput(root, { initial = [], max = MAX_INTERESTS,
+                                      suggestions = INTEREST_SUGGESTIONS,
+                                      placeholder = "Type an interest and press Enter" } = {}) {
+  let tags = [...new Set(initial.map(cleanInterest).filter(Boolean))].slice(0, max);
+  root.classList.add("taginput");
+  root.innerHTML = `
+    <div class="taginput-box">
+      <div class="taginput-chips"></div>
+      <input type="text" class="taginput-field" placeholder="${esc(placeholder)}" autocomplete="off">
+    </div>
+    <div class="taginput-suggest"></div>
+    <div class="taginput-count muted"></div>`;
+  const chips = root.querySelector(".taginput-chips");
+  const field = root.querySelector(".taginput-field");
+  const sugg = root.querySelector(".taginput-suggest");
+  const count = root.querySelector(".taginput-count");
+
+  const add = (value) => {
+    const v = cleanInterest(value);
+    if (!v || tags.includes(v) || tags.length >= max) return;
+    tags.push(v); field.value = ""; render();
+  };
+  const remove = (v) => { tags = tags.filter((t) => t !== v); render(); };
+
+  function render() {
+    chips.innerHTML = tags.map((t) =>
+      `<span class="tag tag-edit">${esc(t)}<button type="button" aria-label="Remove ${esc(t)}" data-rm="${esc(t)}">&times;</button></span>`).join("");
+    chips.querySelectorAll("[data-rm]").forEach((b) => b.addEventListener("click", () => remove(b.dataset.rm)));
+    const full = tags.length >= max;
+    field.disabled = full;
+    field.placeholder = full ? `That's ${max}, remove one to change` : placeholder;
+    const q = cleanInterest(field.value);
+    const shown = suggestions.filter((s) => !tags.includes(s) && (!q || s.includes(q))).slice(0, 12);
+    sugg.innerHTML = full ? "" : shown.map((s) =>
+      `<button type="button" class="tag tag-suggest" data-add="${esc(s)}">+ ${esc(s)}</button>`).join("");
+    sugg.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", () => add(b.dataset.add)));
+    count.textContent = `${tags.length} of ${max}`;
+  }
+
+  field.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === ",") { e.preventDefault(); add(field.value); }
+    else if (e.key === "Backspace" && !field.value && tags.length) remove(tags[tags.length - 1]);
+  });
+  field.addEventListener("input", render);
+  field.addEventListener("blur", () => { if (field.value.trim()) add(field.value); });
+  render();
+  return { get: () => [...tags], set: (next) => { tags = [...next]; render(); } };
 }

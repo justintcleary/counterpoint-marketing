@@ -8,7 +8,7 @@
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=5">
+<link rel="stylesheet" href="portal.css?v=6">
 </head>
 <body>
 
@@ -40,6 +40,11 @@
           <div class="field">
             <label for="fQ">Search</label>
             <input id="fQ" type="search" placeholder="Name, email, handle, niche, location">
+          </div>
+          <div class="field">
+            <label for="fInterest">Interest</label>
+            <input id="fInterest" type="search" list="interestList" placeholder="politics, fitness...">
+            <datalist id="interestList"></datalist>
           </div>
           <div class="field">
             <label for="fStatus">Status</label>
@@ -158,7 +163,7 @@
 <script type="module">
 import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notice, clearNotice,
          GENDERS, LEANINGS, TARGET_GENDERS, TARGET_LEANINGS, optionList, targetChips,
-         STAGES, stagePill, progressBar, progressOf, handleLinks, creatorModal, nameLink } from "./app.js?v=5";
+         STAGES, stagePill, progressBar, progressOf, handleLinks, creatorModal, nameLink, interestChips, INTEREST_SUGGESTIONS } from "./app.js?v=6";
 
 if (requireConfig()) {
   let people = [], orgs = [], campaigns = [], content = [], appRows = [];
@@ -183,10 +188,11 @@ if (requireConfig()) {
     $("#cTGender").innerHTML = optionList(TARGET_GENDERS, "any");
     $("#cTLeaning").innerHTML = optionList(TARGET_LEANINGS, "any");
 
-    ["fQ", "fStatus", "fGender", "fLeaning", "fAgeMin", "fAgeMax"].forEach(id =>
+    $("#interestList").innerHTML = INTEREST_SUGGESTIONS.map(i => `<option value="${i}">`).join("");
+    ["fQ", "fInterest", "fStatus", "fGender", "fLeaning", "fAgeMin", "fAgeMax"].forEach(id =>
       $("#" + id).addEventListener("input", renderCreators));
     $("#fClear").addEventListener("click", () => {
-      ["fQ", "fStatus", "fGender", "fLeaning", "fAgeMin", "fAgeMax"].forEach(id => { $("#" + id).value = ""; });
+      ["fQ", "fInterest", "fStatus", "fGender", "fLeaning", "fAgeMin", "fAgeMax"].forEach(id => { $("#" + id).value = ""; });
       renderCreators();
     });
 
@@ -218,16 +224,19 @@ if (requireConfig()) {
   // answer is only excluded when you actively filter on that field.
   function filteredCreators() {
     const q = $("#fQ").value.trim().toLowerCase();
+    const interest = $("#fInterest").value.trim().toLowerCase();
     const status = $("#fStatus").value, gender = $("#fGender").value, leaning = $("#fLeaning").value;
     const ageMin = Number($("#fAgeMin").value) || null, ageMax = Number($("#fAgeMax").value) || null;
     return people.filter(r => r.role !== "client").filter(r => {
       if (status && r.status !== status) return false;
+      if (interest && !(r.interests || []).some(t => t.includes(interest))
+                   && !(r.niche || "").toLowerCase().includes(interest)) return false;
       if (gender && r.gender !== gender) return false;
       if (leaning && r.political_leaning !== leaning) return false;
       if (ageMin && !(r.age >= ageMin)) return false;
       if (ageMax && !(r.age <= ageMax)) return false;
       if (q) {
-        const hay = [r.full_name, r.email, r.handles, r.tiktok_handle, r.instagram_handle, r.youtube_handle, r.x_handle, r.niche, r.location, r.notes].filter(Boolean).join(" ").toLowerCase();
+        const hay = [r.full_name, r.email, r.handles, r.tiktok_handle, r.instagram_handle, r.youtube_handle, r.x_handle, r.niche, ...(r.interests || []), r.location, r.notes].filter(Boolean).join(" ").toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -251,7 +260,7 @@ if (requireConfig()) {
                 <br><span class="muted">${esc(r.email)}</span>
                 ${handleLinks(r)}
                 ${r.notes ? `<span class="muted">${esc(r.notes)}</span>` : ""}</td>
-            <td class="muted">${esc(r.audience_size || "")}${r.niche ? `<br>${esc(r.niche)}` : ""}</td>
+            <td class="muted">${esc(r.audience_size || "")}${interestChips(r, "tag-interest")}</td>
             <td class="muted">
               ${r.age ? `${r.age}` : '<span class="faint">age not given</span>'}
               ${r.gender ? `<br>${esc(r.gender)}` : ""}
@@ -373,6 +382,7 @@ if (requireConfig()) {
     $$("[data-match]").forEach(b => b.addEventListener("click", () => {
       const c = campaigns.find(x => x.id === b.dataset.match);
       $("#fQ").value = ""; $("#fStatus").value = "approved";
+      $("#fInterest").value = c.target_niche || "";
       $("#fGender").value = c.target_gender && c.target_gender !== "any" ? c.target_gender : "";
       $("#fLeaning").value = c.target_leaning && c.target_leaning !== "any" ? c.target_leaning : "";
       $("#fAgeMin").value = c.target_age_min || ""; $("#fAgeMax").value = c.target_age_max || "";
@@ -450,7 +460,8 @@ if (requireConfig()) {
             <td>${nameLink(a.creator_id, a.full_name)}<br><span class="muted">${esc(a.email)}</span>
                 ${handleLinks(a)}
                 ${a.audience_size ? `<span class="muted">${esc(a.audience_size)}</span>` : ""}
-                <br><span class="muted">${esc([a.age, a.gender, a.political_leaning, a.location].filter(Boolean).join(" / "))}</span></td>
+                <br><span class="muted">${esc([a.age, a.gender, a.political_leaning, a.location].filter(Boolean).join(" / "))}</span>
+                ${interestChips(a, "tag-interest")}</td>
             <td>${esc(a.campaign_title)}<br><span class="muted">${esc(a.client_name || "")}</span></td>
             <td class="muted">${esc(a.pitch || "")}</td>
             <td class="muted">${fmtDate(a.created_at)}</td>

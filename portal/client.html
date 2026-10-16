@@ -8,7 +8,7 @@
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=5">
+<link rel="stylesheet" href="portal.css?v=6">
 </head>
 <body>
 
@@ -94,6 +94,9 @@
         <div class="card tight filters">
           <div class="field-row">
             <div class="field"><label for="fQ">Search</label><input id="fQ" type="search" placeholder="Niche, location, name"></div>
+            <div class="field"><label for="fInterest">Interest</label>
+              <input id="fInterest" type="search" list="interestList" placeholder="politics, fitness...">
+              <datalist id="interestList"></datalist></div>
             <div class="field"><label for="fSize">Audience</label><input id="fSize" type="search" placeholder="e.g. 50K"></div>
           </div>
           <div class="field-row">
@@ -123,7 +126,7 @@
 import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notice, clearNotice,
          notifyTeam, GENDERS, LEANINGS, TARGET_GENDERS, TARGET_LEANINGS, optionList,
          targetChips, stagePill, progressBar, progressOf, campaignStatusLabel, handleLinks,
-         creatorModal, nameLink } from "./app.js?v=5";
+         creatorModal, nameLink, interestChips, INTEREST_SUGGESTIONS } from "./app.js?v=6";
 
 if (requireConfig()) {
   const profile = await guard("client");
@@ -168,10 +171,11 @@ if (requireConfig()) {
       $("#cTLeaning").innerHTML = optionList(TARGET_LEANINGS, "any");
       $("#fGender").innerHTML += optionList(GENDERS);
       $("#fLeaning").innerHTML += optionList(LEANINGS);
-      ["fQ", "fSize", "fGender", "fLeaning", "fAgeMin", "fAgeMax"].forEach(id =>
+      $("#interestList").innerHTML = INTEREST_SUGGESTIONS.map(i => `<option value="${i}">`).join("");
+      ["fQ", "fInterest", "fSize", "fGender", "fLeaning", "fAgeMin", "fAgeMax"].forEach(id =>
         $("#" + id).addEventListener("input", renderCreators));
       $("#fClear").addEventListener("click", () => {
-        ["fQ", "fSize", "fGender", "fLeaning", "fAgeMin", "fAgeMax"].forEach(id => { $("#" + id).value = ""; });
+        ["fQ", "fInterest", "fSize", "fGender", "fLeaning", "fAgeMin", "fAgeMax"].forEach(id => { $("#" + id).value = ""; });
         renderCreators();
       });
 
@@ -263,7 +267,8 @@ if (requireConfig()) {
                   ${nameLink(a.creator_id, a.full_name || "Creator")}
                   ${statusPill(a.status)}
                 </div>
-                <div class="muted">${esc([a.audience_size, a.niche, a.location, a.age, a.gender, a.political_leaning].filter(Boolean).join(" / "))}</div>
+                <div class="muted">${esc([a.audience_size, a.location, a.age, a.gender, a.political_leaning].filter(Boolean).join(" / "))}</div>
+                ${interestChips(a, "tag-interest")}
                 ${handleLinks(a)}
                 ${a.pitch ? `<div style="margin-top:4px">${esc(a.pitch)}</div>` : ""}
               </div>`).join("")}
@@ -343,6 +348,7 @@ if (requireConfig()) {
   function renderCreators() {
     const q = $("#fQ").value.trim().toLowerCase();
     const size = $("#fSize").value.trim().toLowerCase();
+    const interest = $("#fInterest").value.trim().toLowerCase();
     const gender = $("#fGender").value, leaning = $("#fLeaning").value;
     const ageMin = Number($("#fAgeMin").value) || null, ageMax = Number($("#fAgeMax").value) || null;
     const rows = creators.filter(r => {
@@ -351,6 +357,8 @@ if (requireConfig()) {
       if (ageMin && !(r.age >= ageMin)) return false;
       if (ageMax && !(r.age <= ageMax)) return false;
       if (size && !(r.audience_size || "").toLowerCase().includes(size)) return false;
+      if (interest && !(r.interests || []).some(t => t.includes(interest))
+                   && !(r.niche || "").toLowerCase().includes(interest)) return false;
       if (q && ![r.full_name, r.niche, r.location].filter(Boolean).join(" ").toLowerCase().includes(q)) return false;
       return true;
     });
@@ -361,7 +369,8 @@ if (requireConfig()) {
       : `<div class="grid">${rows.map(r => `
           <article class="card">
             <h3 style="margin:0 0 6px">${nameLink(r.id, r.full_name || "Creator")}</h3>
-            <div class="muted">${esc(r.niche || "")}${r.audience_size ? ` · ${esc(r.audience_size)}` : ""}</div>
+            ${r.audience_size ? `<div class="muted">${esc(r.audience_size)}</div>` : ""}
+            ${interestChips(r, "tag-interest")}
             <div class="tags">
               ${[r.gender, r.age ? r.age + " yrs" : null, r.political_leaning, r.location]
                 .filter(Boolean).map(t => `<span class="tag">${esc(t)}</span>`).join("")}

@@ -9,7 +9,7 @@
 <link rel="icon" href="../favicon.ico" sizes="32x32">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=5">
+<link rel="stylesheet" href="portal.css?v=6">
 </head>
 <body>
 
@@ -85,15 +85,13 @@
             <label for="suHandles">Other platforms</label>
             <input id="suHandles" type="text" placeholder="Twitch, Substack, Facebook...">
           </div>
-          <div class="field-row">
-            <div class="field">
-              <label for="suSize">Audience size</label>
-              <input id="suSize" type="text" placeholder="e.g. 45K across platforms">
-            </div>
-            <div class="field">
-              <label for="suNiche">Your niche</label>
-              <input id="suNiche" type="text" placeholder="politics, health, sports...">
-            </div>
+          <div class="field">
+            <label for="suSize">Audience size</label>
+            <input id="suSize" type="text" placeholder="e.g. 45K across platforms">
+          </div>
+          <div class="field">
+            <label>What you post about <span class="faint">(up to five)</span></label>
+            <div id="suInterests"></div>
           </div>
           <div class="field">
             <label for="suLocation">Location</label>
@@ -138,7 +136,7 @@
 
 <script type="module">
 import { sb, requireConfig, $, $$, notice, clearNotice, notifyTeam, currentProfile, homeFor,
-         GENDERS, LEANINGS, optionList, cleanHandle, hasAnyHandle, handleText } from "./app.js?v=5";
+         GENDERS, LEANINGS, optionList, cleanHandle, hasAnyHandle, handleText, mountTagInput } from "./app.js?v=6";
 
 if (requireConfig()) {
   const loginView = $("#loginView"), signupView = $("#signupView"), doneView = $("#doneView");
@@ -146,6 +144,7 @@ if (requireConfig()) {
 
   $("#suGender").innerHTML += optionList(GENDERS);
   $("#suLeaning").innerHTML += optionList(LEANINGS);
+  const interests = mountTagInput($("#suInterests"));
 
   // ---- creator vs client signup ----
   let accountType = "creator";
@@ -199,7 +198,7 @@ if (requireConfig()) {
       youtube_handle: cleanHandle($("#suYoutube").value),
       x_handle: cleanHandle($("#suX").value),
       audience_size: $("#suSize").value.trim(),
-      niche: $("#suNiche").value.trim(),
+      interests: interests.get(),
       location: $("#suLocation").value.trim(),
       age: $("#suAge").value.trim(),
       gender: $("#suGender").value,
@@ -224,7 +223,7 @@ if (requireConfig()) {
       account_type: accountType, organization: payload.company,
       name: payload.full_name, email,
       handles: handleText(payload), audience_size: payload.audience_size,
-      niche: payload.niche, location: payload.location,
+      interests: payload.interests.join(", "), location: payload.location,
       age: payload.age, gender: payload.gender,
       political_leaning: payload.political_leaning, notes: payload.notes,
     });

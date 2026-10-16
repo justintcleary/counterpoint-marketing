@@ -8,7 +8,7 @@
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=5">
+<link rel="stylesheet" href="portal.css?v=6">
 </head>
 <body>
 
@@ -87,15 +87,13 @@
             <label for="pfHandles">Other platforms</label>
             <input id="pfHandles" type="text" placeholder="Twitch, Substack, Facebook...">
           </div>
-          <div class="field-row">
-            <div class="field">
-              <label for="pfSize">Audience size</label>
-              <input id="pfSize" type="text" placeholder="e.g. 45K across platforms">
-            </div>
-            <div class="field">
-              <label for="pfNiche">Your niche</label>
-              <input id="pfNiche" type="text" placeholder="politics, health, sports...">
-            </div>
+          <div class="field">
+            <label for="pfSize">Audience size</label>
+            <input id="pfSize" type="text" placeholder="e.g. 45K across platforms">
+          </div>
+          <div class="field">
+            <label>What you post about <span class="faint">(up to five)</span></label>
+            <div id="pfInterests"></div>
           </div>
           <div class="field-row">
             <div class="field">
@@ -131,7 +129,7 @@
 <script type="module">
 import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notifyTeam, notice,
          GENDERS, LEANINGS, optionList, targetChips, matchesTarget,
-         STAGES, stagePill, cleanHandle, handleText } from "./app.js?v=5";
+         STAGES, stagePill, cleanHandle, handleText, mountTagInput } from "./app.js?v=6";
 
 if (requireConfig()) {
   const profile = await guard("creator");
@@ -236,7 +234,7 @@ if (requireConfig()) {
         campaign: campaign?.title || id, client: campaign?.client_name || "",
         creator: profile.full_name, email: profile.email,
         handles: handleText(profile), audience_size: profile.audience_size,
-        niche: profile.niche, pitch,
+        interests: (profile.interests || []).join(", "), pitch,
       });
       await loadCampaigns();
     }));
@@ -312,7 +310,7 @@ if (requireConfig()) {
     $("#pfYoutube").value = profile.youtube_handle || "";
     $("#pfX").value = profile.x_handle || "";
     $("#pfSize").value = profile.audience_size || "";
-    $("#pfNiche").value = profile.niche || "";
+    const interests = mountTagInput($("#pfInterests"), { initial: profile.interests || [] });
     $("#pfLocation").value = profile.location || "";
     $("#pfAge").value = profile.age || "";
     $("#pfNotes").value = profile.notes || "";
@@ -331,7 +329,7 @@ if (requireConfig()) {
         youtube_handle: cleanHandle($("#pfYoutube").value),
         x_handle: cleanHandle($("#pfX").value),
         audience_size: $("#pfSize").value.trim(),
-        niche: $("#pfNiche").value.trim(),
+        interests: interests.get(),
         location: $("#pfLocation").value.trim(),
         age: $("#pfAge").value ? Number($("#pfAge").value) : null,
         gender: $("#pfGender").value || null,

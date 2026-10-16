@@ -114,6 +114,16 @@ That is enforced in the database, not just hidden in the page: clients have no
 read access to `profiles` at all and go through the `creator_directory`,
 `client_application_details` and `content_details` views instead.
 
+## Interests
+
+Creators pick up to five interest tags (`profiles.interests`, a text array
+capped at five in the database). Signup and My profile use a chip editor with
+a suggestion list from `INTEREST_SUGGESTIONS` in `portal/app.js`, but any word
+is allowed, lowercased. Admins and clients filter the roster by interest, and
+Find matches carries a campaign's niche into that filter. The old free-text
+`niche` column was split on commas into tags once, and is kept only as a
+fallback display for anyone with no tags.
+
 ## Social handles
 
 Handles are stored one column per platform: `tiktok_handle`,

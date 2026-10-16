@@ -27,7 +27,8 @@ create table if not exists public.profiles (
   youtube_handle    text,
   x_handle          text,
   audience_size     text,
-  niche             text,
+  niche             text,          -- legacy free text, superseded by interests
+  interests         text[] not null default '{}',
   location          text,
   age               int,
   gender            text,
@@ -102,6 +103,23 @@ alter table public.profiles   add column if not exists tiktok_handle     text;
 alter table public.profiles   add column if not exists instagram_handle  text;
 alter table public.profiles   add column if not exists youtube_handle    text;
 alter table public.profiles   add column if not exists x_handle          text;
+alter table public.profiles   add column if not exists interests         text[] not null default '{}';
+
+-- Up to five interest tags per creator.
+alter table public.profiles drop constraint if exists profiles_interests_check;
+alter table public.profiles add  constraint profiles_interests_check
+  check (cardinality(interests) <= 5);
+create index if not exists profiles_interests_idx on public.profiles using gin(interests);
+
+-- One-time carry-over: split the old free-text niche into tags for anyone
+-- who has not picked interests yet. Creators can tidy them under My profile.
+update public.profiles
+set interests = coalesce((
+  select array_agg(t) from (
+    select lower(trim(x)) as t
+    from unnest(string_to_array(niche, ',')) as x
+    where trim(x) <> '' limit 5) s), '{}')
+where cardinality(interests) = 0 and coalesce(niche, '') <> '';
 
 alter table public.campaigns  add column if not exists target_gender   text default 'any';
 alter table public.campaigns  add column if not exists target_age_min  int;
@@ -215,7 +233,7 @@ begin
   insert into public.profiles (
     id, email, full_name, handles,
     tiktok_handle, instagram_handle, youtube_handle, x_handle,
-    audience_size, niche, location,
+    audience_size, niche, interests, location,
     age, gender, political_leaning, notes, role, client_id)
   values (
     new.id,
@@ -228,6 +246,11 @@ begin
     nullif(new.raw_user_meta_data->>'x_handle',''),
     new.raw_user_meta_data->>'audience_size',
     new.raw_user_meta_data->>'niche',
+    coalesce((select array_agg(lower(trim(x)))
+              from jsonb_array_elements_text(
+                case when jsonb_typeof(new.raw_user_meta_data->'interests') = 'array'
+                     then new.raw_user_meta_data->'interests' else '[]'::jsonb end) as x
+              where trim(x) <> ''), '{}'),
     new.raw_user_meta_data->>'location',
     nullif(new.raw_user_meta_data->>'age','')::int,
     nullif(new.raw_user_meta_data->>'gender',''),
@@ -411,7 +434,7 @@ with (security_invoker = true) as
          c.id as campaign_id, c.title as campaign_title, c.client_name,
          p.id as creator_id, p.full_name, p.email, p.handles,
          p.tiktok_handle, p.instagram_handle, p.youtube_handle, p.x_handle,
-         p.audience_size, p.niche, p.location, p.age, p.gender, p.political_leaning
+         p.audience_size, p.niche, p.interests, p.location, p.age, p.gender, p.political_leaning
   from public.applications a
   join public.campaigns c on c.id = a.campaign_id
   join public.profiles  p on p.id = a.creator_id;
@@ -419,7 +442,7 @@ with (security_invoker = true) as
 drop view if exists public.creator_directory;
 create view public.creator_directory
 with (security_invoker = false) as
-  select p.id, p.full_name, p.audience_size, p.niche, p.location,
+  select p.id, p.full_name, p.audience_size, p.niche, p.interests, p.location,
          p.age, p.gender, p.political_leaning, p.created_at
   from public.profiles p
   where p.status = 'approved'
@@ -431,7 +454,7 @@ create view public.client_application_details
 with (security_invoker = false) as
   select a.id, a.status, a.pitch, a.created_at,
          c.id as campaign_id, c.title as campaign_title,
-         p.id as creator_id, p.full_name, p.audience_size, p.niche,
+         p.id as creator_id, p.full_name, p.audience_size, p.niche, p.interests,
          p.location, p.age, p.gender, p.political_leaning,
          case when a.status = 'accepted' then p.handles          else null end as handles,
          case when a.status = 'accepted' then p.tiktok_handle    else null end as tiktok_handle,
