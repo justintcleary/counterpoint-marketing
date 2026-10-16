@@ -9,7 +9,7 @@
 <link rel="icon" href="../favicon.ico" sizes="32x32">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=6">
+<link rel="stylesheet" href="portal.css?v=7">
 </head>
 <body>
 
@@ -42,6 +42,23 @@
           <button class="btn btn-primary btn-wide" type="submit">Sign in</button>
         </form>
         <p class="switcher">New here? <button type="button" id="toSignup">Apply to join</button></p>
+        <p class="switcher"><button type="button" id="toForgot">Forgot your password?</button></p>
+      </section>
+
+      <!-- ---------------- forgot password ---------------- -->
+      <section id="forgotView" class="hidden">
+        <p class="kicker">counterpoint portal</p>
+        <h1>Reset your password.</h1>
+        <p class="sub">Enter the email you signed up with and we will send a link to set a new one.</p>
+        <div id="forgotNote" class="note hidden"></div>
+        <form id="forgotForm" class="card">
+          <div class="field">
+            <label for="fgEmail">Email</label>
+            <input id="fgEmail" type="email" autocomplete="email" required>
+          </div>
+          <button class="btn btn-primary btn-wide" type="submit">Send reset link</button>
+        </form>
+        <p class="switcher">Remembered it? <button type="button" id="forgotToLogin">Sign in</button></p>
       </section>
 
       <!-- ---------------- sign up ---------------- -->
@@ -135,12 +152,12 @@
 </main>
 
 <script type="module">
-import { sb, requireConfig, $, $$, notice, clearNotice, notifyTeam, currentProfile, homeFor,
-         GENDERS, LEANINGS, optionList, cleanHandle, hasAnyHandle, handleText, mountTagInput } from "./app.js?v=6";
+import { sb, requireConfig, $, $$, notice, clearNotice, currentProfile, homeFor,
+         GENDERS, LEANINGS, optionList, cleanHandle, hasAnyHandle, handleText, mountTagInput } from "./app.js?v=7";
 
 if (requireConfig()) {
-  const loginView = $("#loginView"), signupView = $("#signupView"), doneView = $("#doneView");
-  const show = (el) => { [loginView, signupView, doneView].forEach(v => v.classList.add("hidden")); el.classList.remove("hidden"); };
+  const loginView = $("#loginView"), signupView = $("#signupView"), doneView = $("#doneView"), forgotView = $("#forgotView");
+  const show = (el) => { [loginView, signupView, doneView, forgotView].forEach(v => v.classList.add("hidden")); el.classList.remove("hidden"); };
 
   $("#suGender").innerHTML += optionList(GENDERS);
   $("#suLeaning").innerHTML += optionList(LEANINGS);
@@ -164,6 +181,21 @@ if (requireConfig()) {
 
   $("#toSignup").addEventListener("click", () => show(signupView));
   $("#toLogin").addEventListener("click", () => show(loginView));
+  $("#toForgot").addEventListener("click", () => { $("#fgEmail").value = $("#liEmail").value; show(forgotView); });
+  $("#forgotToLogin").addEventListener("click", () => show(loginView));
+
+  // ---- forgot password ----
+  $("#forgotForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const note = $("#forgotNote"); clearNotice(note);
+    const btn = e.target.querySelector("button"); btn.disabled = true; btn.textContent = "Sending...";
+    const { error } = await sb.auth.resetPasswordForEmail($("#fgEmail").value.trim(), {
+      redirectTo: new URL("reset.html", location.href).href,
+    });
+    btn.disabled = false; btn.textContent = "Send reset link";
+    if (error) { notice(note, error.message); return; }
+    notice(note, "If that address has an account, a reset link is on its way. Check spam if it does not show up in a minute.", "ok");
+  });
   if (location.hash === "#apply") show(signupView);
 
   // already signed in? go straight through
@@ -217,16 +249,7 @@ if (requireConfig()) {
     btn.disabled = false; btn.textContent = "Submit application";
     if (error) { notice(note, error.message); return; }
 
-    await notifyTeam(accountType === "client"
-        ? "New client account request - counterpoint.marketing"
-        : "New creator application - counterpoint.marketing", {
-      account_type: accountType, organization: payload.company,
-      name: payload.full_name, email,
-      handles: handleText(payload), audience_size: payload.audience_size,
-      interests: payload.interests.join(", "), location: payload.location,
-      age: payload.age, gender: payload.gender,
-      political_leaning: payload.political_leaning, notes: payload.notes,
-    });
+    // Bence is emailed by the on_profile_created trigger.
     show(doneView);
   });
 }

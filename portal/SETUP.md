@@ -47,26 +47,53 @@ where email = 'bence@counterpoint.marketing';
 
 Reload the portal and an **Admin** link appears in the top nav.
 
-### 3. Turn on email notifications
+### 3. Connect Resend so emails actually send
 
-New signups, client briefs submitted for review, and change requests on
-content are emailed to bence@counterpoint.marketing through FormSubmit from
-the browser.
+Every notification leaves from the database (triggers in `supabase/schema.sql`
+that post to Resend through `pg_net`). Until the Resend key is in place,
+alerts to Bence fall back to FormSubmit and emails to creators and clients are
+skipped. To switch it on:
 
-Campaign applications are different: the `on_application_created` trigger in
-the database sends them through FormSubmit (via `pg_net`) to Bence with every
-approved user of the campaign's client organization on CC. That way the
-client's addresses never reach the creator's browser, and the email goes out
-even if the creator closes the tab. Internal campaigns with no organization
-just go to Bence. If an application ever fails to notify, the application
-still saves; check `net._http_response` in the SQL editor for the reason. The very first message triggers a one time confirmation:
+1. Create a free Resend account at resend.com and add the domain
+   `counterpoint.marketing`. Resend shows three DNS records (DKIM, SPF for a
+   `send` subdomain, and an MX). Add them at Namecheap and click Verify.
+2. In Resend, create an API key (Sending access is enough).
+3. In Supabase go to **Integrations > Vault > Add new secret**. Name it exactly
+   `resend_api_key`, paste the key as the value. Never put this key in the repo.
+4. In Supabase go to **Authentication > Emails > SMTP Settings**, enable
+   custom SMTP: host `smtp.resend.com`, port `465`, username `resend`, password
+   the same API key, sender `portal@counterpoint.marketing`. This routes
+   password resets and confirmations through Resend too.
+5. Then, under **Authentication > Sign In / Providers**, turn **Confirm email**
+   back on. The two-per-hour limit only applied to Supabase's own mailer.
 
-1. Have someone sign up through the portal, or submit once yourself.
-2. Bence gets a FormSubmit confirmation email. He clicks the link.
-3. From then on every signup and application lands in his inbox automatically.
+Who gets what:
 
-Until that link is clicked, notifications are held, not delivered. Everything
-still saves to the database either way, so nothing is lost.
+| Event | To | CC |
+| --- | --- | --- |
+| New creator or client signup | Bence | |
+| Account approved | the person | |
+| Creator applies to a campaign | Bence | the client's approved users |
+| Application accepted or declined | the creator | |
+| Client submits a brief for review | Bence | |
+| Campaign opened to creators | the client's users | |
+| Content submitted for review | the client's users | Bence |
+| Changes requested | the creator | Bence |
+| Content approved | the creator | |
+| Content posted | the client's users | Bence |
+
+Rejections of signups are deliberately not emailed. That one deserves a human.
+
+To check whether a given email went out, open the SQL editor and run
+`select * from net._http_response order by id desc limit 10;`. A `200` with
+an `id` in the body is Resend accepting it. Warnings from skipped sends show
+in **Logs > Postgres**.
+
+### 4. Forgot password
+
+`portal/index.html` has a "Forgot your password?" link and `portal/reset.html`
+handles the link Supabase emails. Both only work once custom SMTP (step 3.4)
+is in place.
 
 ## How it works
 

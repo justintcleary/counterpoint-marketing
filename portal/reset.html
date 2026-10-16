@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reset password | counterpoint.marketing</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="portal.css?v=7">
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a href="../index.html" class="logo">counterpoint<span>.marketing</span></a>
+    <div class="nav-links"><a href="index.html">Sign in</a></div>
+  </div>
+</header>
+
+<main id="main">
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <section id="waiting">
+        <p class="kicker">counterpoint portal</p>
+        <h1>Checking your link.</h1>
+        <p class="sub">One moment.</p>
+      </section>
+
+      <section id="form" class="hidden">
+        <p class="kicker">counterpoint portal</p>
+        <h1>Choose a new password.</h1>
+        <div id="note" class="note hidden"></div>
+        <form id="resetForm" class="card">
+          <div class="field">
+            <label for="pw1">New password</label>
+            <input id="pw1" type="password" autocomplete="new-password" minlength="8" required>
+          </div>
+          <div class="field">
+            <label for="pw2">Repeat it</label>
+            <input id="pw2" type="password" autocomplete="new-password" minlength="8" required>
+          </div>
+          <button class="btn btn-primary btn-wide" type="submit">Save password</button>
+        </form>
+      </section>
+
+      <section id="bad" class="hidden">
+        <p class="kicker">counterpoint portal</p>
+        <h1>That link did not work.</h1>
+        <p class="sub">Reset links expire after an hour and only work once. Request a fresh one and try again.</p>
+        <a class="btn btn-ghost" href="index.html">Back to sign in</a>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+import { sb, requireConfig, $, notice, clearNotice, currentProfile, homeFor } from "./app.js?v=7";
+
+if (requireConfig()) {
+  const show = (id) => ["waiting", "form", "bad"].forEach(x => $("#" + x).classList.toggle("hidden", x !== id));
+
+  // The recovery link signs the user in with a short-lived session; supabase-js
+  // picks it up from the URL and fires PASSWORD_RECOVERY.
+  let ready = false;
+  sb.auth.onAuthStateChange((event, session) => {
+    if ((event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") && session) { ready = true; show("form"); }
+  });
+  setTimeout(async () => {
+    if (ready) return;
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) { ready = true; show("form"); } else show("bad");
+  }, 2500);
+
+  $("#resetForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const note = $("#note"); clearNotice(note);
+    const a = $("#pw1").value, b = $("#pw2").value;
+    if (a !== b) { notice(note, "Those do not match."); return; }
+    const btn = e.target.querySelector("button"); btn.disabled = true; btn.textContent = "Saving...";
+    const { error } = await sb.auth.updateUser({ password: a });
+    btn.disabled = false; btn.textContent = "Save password";
+    if (error) { notice(note, error.message); return; }
+    notice(note, "Password saved. Taking you in...", "ok");
+    setTimeout(async () => { location.href = homeFor(await currentProfile()); }, 900);
+  });
+}
+</script>
+</body>
+</html>

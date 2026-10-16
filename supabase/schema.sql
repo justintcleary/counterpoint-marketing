@@ -301,80 +301,335 @@ create trigger content_items_touch
   before update on public.content_items
   for each row execute function public.touch_updated_at();
 
--- ---------- Email when a creator applies ------------------------------
--- Sent from the database through FormSubmit so the client's addresses never
--- reach the creator's browser. Goes to Bence, with every approved user of the
--- campaign's client organization on CC.
+-- ---------- Email notifications ---------------------------------------
+-- All email leaves from the database, so client and creator addresses never
+-- reach anyone's browser and nothing depends on a tab staying open.
+--
+-- Outbound mail goes through Resend. The API key lives in Supabase Vault
+-- under the name resend_api_key (Dashboard > Integrations > Vault). Until it
+-- is there, internal alerts to Bence fall back to FormSubmit and emails to
+-- creators and clients are skipped with a warning in the Postgres logs.
 
 create extension if not exists pg_net with schema extensions;
 
-create or replace function public.send_notification(subject text, cc text, fields jsonb)
+create or replace function public.notify_address() returns text
+language sql immutable as $$ select 'bence@counterpoint.marketing' $$;
+
+create or replace function public.portal_url() returns text
+language sql immutable as $$ select 'https://counterpoint.marketing/portal/' $$;
+
+create or replace function public.from_address() returns text
+language sql immutable as $$ select 'counterpoint.marketing <portal@counterpoint.marketing>' $$;
+
+-- Escape user-supplied text before it goes into HTML.
+create or replace function public.h(value text) returns text
+language sql immutable as $$
+  select replace(replace(replace(replace(coalesce(value, ''),
+    '&', '&amp;'), '<', '&lt;'), '>', '&gt;'), '"', '&quot;');
+$$;
+
+create or replace function public.email_html(heading text, body text, cta_label text, cta_url text)
+returns text language sql immutable as $$
+  select '<!doctype html><html><body style="margin:0;background:#f4f4f6;font-family:Arial,Helvetica,sans-serif;color:#0b0b0f">'
+    || '<div style="max-width:560px;margin:0 auto;padding:32px 20px">'
+    || '<div style="font-weight:700;font-size:18px;margin-bottom:22px">counterpoint<span style="color:#7c5cff">.marketing</span></div>'
+    || '<div style="background:#ffffff;border:1px solid #e3e3ea;border-radius:12px;padding:28px">'
+    || '<h1 style="font-size:22px;line-height:1.25;margin:0 0 14px">' || heading || '</h1>'
+    || '<div style="font-size:15px;line-height:1.55">' || body || '</div>'
+    || case when cta_url is not null then
+         '<a href="' || cta_url || '" style="display:inline-block;margin-top:22px;background:#d6ff3f;color:#0b0b0f;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:999px">'
+         || cta_label || '</a>' else '' end
+    || '</div><p style="color:#8a8a99;font-size:12px;line-height:1.5;margin-top:18px">'
+    || 'Strategic influencer and digital communications. You are getting this because you have an account at counterpoint.marketing.</p>'
+    || '</div></body></html>';
+$$;
+
+create or replace function public.resend_key() returns text
+language plpgsql security definer stable set search_path = public, vault as $$
+declare k text;
+begin
+  select decrypted_secret into k from vault.decrypted_secrets where name = 'resend_api_key' limit 1;
+  return nullif(trim(k), '');
+exception when others then
+  return null;
+end; $$;
+revoke all on function public.resend_key() from public;
+
+-- Send one email. to_list and cc_list are comma-separated.
+create or replace function public.send_email(to_list text, cc_list text, subject text, html text, plain text)
 returns bigint language plpgsql security definer
 set search_path = public, extensions as $$
 declare
-  payload jsonb := jsonb_build_object('_subject', subject) || coalesce(fields, '{}'::jsonb);
+  key   text := public.resend_key();
+  tos   text[] := array_remove(string_to_array(replace(coalesce(to_list, ''), ' ', ''), ','), '');
+  ccs   text[] := array_remove(string_to_array(replace(coalesce(cc_list, ''), ' ', ''), ','), '');
+  body  jsonb;
 begin
-  if coalesce(cc, '') <> '' then
-    payload := payload || jsonb_build_object('_cc', cc);
+  if cardinality(tos) = 0 then return null; end if;
+
+  if key is null then
+    -- Degraded mode: only internal alerts, through FormSubmit.
+    if public.notify_address() = any(tos) then
+      return net.http_post(
+        url     := 'https://formsubmit.co/ajax/' || public.notify_address(),
+        body    := jsonb_build_object('_subject', subject, 'message', plain)
+                   || case when cardinality(ccs) > 0 then jsonb_build_object('_cc', array_to_string(ccs, ',')) else '{}'::jsonb end,
+        headers := jsonb_build_object('Content-Type', 'application/json', 'Accept', 'application/json',
+                                      'Origin', 'https://counterpoint.marketing',
+                                      'Referer', public.portal_url()));
+    end if;
+    raise warning 'send_email skipped (no resend_api_key in Vault): % -> %', subject, to_list;
+    return null;
   end if;
+
+  body := jsonb_build_object(
+    'from', public.from_address(), 'to', to_jsonb(tos),
+    'subject', subject, 'html', html, 'text', plain);
+  if cardinality(ccs) > 0 then body := body || jsonb_build_object('cc', to_jsonb(ccs)); end if;
+
   return net.http_post(
-    url     := 'https://formsubmit.co/ajax/bence@counterpoint.marketing',
-    body    := payload,
-    -- FormSubmit refuses requests that do not look like they came from a page.
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Accept',       'application/json',
-      'Origin',       'https://counterpoint.marketing',
-      'Referer',      'https://counterpoint.marketing/portal/'));
+    url     := 'https://api.resend.com/emails',
+    body    := body,
+    headers := jsonb_build_object('Authorization', 'Bearer ' || key, 'Content-Type', 'application/json'));
+end; $$;
+revoke all on function public.send_email(text, text, text, text, text) from public;
+
+-- Approved users of a client organization, comma-separated.
+create or replace function public.client_emails(org uuid) returns text
+language sql security definer stable set search_path = public as $$
+  select string_agg(email, ',') from public.profiles
+  where org is not null and client_id = org and role = 'client' and status = 'approved';
+$$;
+revoke all on function public.client_emails(uuid) from public;
+
+create or replace function public.creator_handle_text(p public.profiles) returns text
+language sql immutable as $$
+  select concat_ws(', ',
+    case when p.tiktok_handle    is not null then 'TikTok @'    || p.tiktok_handle    end,
+    case when p.instagram_handle is not null then 'Instagram @' || p.instagram_handle end,
+    case when p.youtube_handle   is not null then 'YouTube @'   || p.youtube_handle   end,
+    case when p.x_handle         is not null then 'X @'         || p.x_handle         end,
+    p.handles);
+$$;
+
+-- ----- new signup: tell Bence -----
+create or replace function public.notify_new_profile()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare kind text := case when new.role = 'client' then 'client account request' else 'creator application' end;
+        org  text := (select name from public.clients where id = new.client_id);
+        plain text;
+begin
+  plain := format(E'%s\nName: %s\nEmail: %s\nOrganization: %s\nHandles: %s\nAudience: %s\nInterests: %s\nLocation: %s\nNotes: %s',
+    initcap(kind), coalesce(new.full_name, ''), new.email, coalesce(org, ''),
+    public.creator_handle_text(new), coalesce(new.audience_size, ''),
+    array_to_string(new.interests, ', '), coalesce(new.location, ''), coalesce(new.notes, ''));
+  perform public.send_email(public.notify_address(), null,
+    'New ' || kind || ' - ' || coalesce(new.full_name, new.email),
+    public.email_html('New ' || kind,
+      '<p>' || replace(public.h(plain), E'\n', '<br>') || '</p>', 'Review in admin', public.portal_url() || 'admin.html'),
+    plain);
+  return new;
+exception when others then
+  raise warning 'notify_new_profile failed: %', sqlerrm; return new;
 end; $$;
 
-revoke all on function public.send_notification(text, text, jsonb) from public;
+drop trigger if exists on_profile_created on public.profiles;
+create trigger on_profile_created after insert on public.profiles
+  for each row execute function public.notify_new_profile();
 
+-- ----- approval: tell the person -----
+create or replace function public.notify_profile_approved()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare first text := split_part(coalesce(new.full_name, ''), ' ', 1);
+        org   text := (select name from public.clients where id = new.client_id);
+begin
+  if new.status = 'approved' and old.status is distinct from 'approved' then
+    if new.role = 'client' then
+      perform public.send_email(new.email, null,
+        'Your counterpoint.marketing workspace is ready',
+        public.email_html('You are in' || case when first <> '' then ', ' || public.h(first) else '' end || '.',
+          '<p>Your workspace for <strong>' || public.h(coalesce(org, 'your organization')) || '</strong> is open. '
+          || 'Brief a campaign, browse the creator roster, and follow content from draft to posted.</p>',
+          'Open the client portal', public.portal_url() || 'client.html'),
+        'Your workspace is open. Sign in at ' || public.portal_url());
+    elsif new.role = 'creator' then
+      perform public.send_email(new.email, null,
+        'You are approved for the counterpoint.marketing creator network',
+        public.email_html('Welcome aboard' || case when first <> '' then ', ' || public.h(first) else '' end || '.',
+          '<p>Your application is approved. Open campaigns show up in your portal as they go live, with the brief, '
+          || 'the rate, and who the client is looking for, and you apply to the ones that fit.</p>'
+          || '<p>One thing that helps us match you: keep your profile current, especially interests, handles and audience size.</p>',
+          'See open campaigns', public.portal_url() || 'dashboard.html'),
+        'Your application is approved. Sign in at ' || public.portal_url());
+    end if;
+  end if;
+  return new;
+exception when others then
+  raise warning 'notify_profile_approved failed: %', sqlerrm; return new;
+end; $$;
+
+drop trigger if exists on_profile_approved on public.profiles;
+create trigger on_profile_approved after update of status on public.profiles
+  for each row execute function public.notify_profile_approved();
+
+-- ----- new application: Bence, with the client on CC -----
 create or replace function public.notify_new_application()
-returns trigger language plpgsql security definer
-set search_path = public as $$
-declare
-  c   public.campaigns%rowtype;
-  p   public.profiles%rowtype;
-  cc  text;
+returns trigger language plpgsql security definer set search_path = public as $$
+declare c public.campaigns%rowtype; p public.profiles%rowtype; plain text;
 begin
   select * into c from public.campaigns where id = new.campaign_id;
   select * into p from public.profiles  where id = new.creator_id;
-
-  select string_agg(email, ',') into cc
-  from public.profiles
-  where c.client_id is not null and client_id = c.client_id
-    and role = 'client' and status = 'approved';
-
-  perform public.send_notification(
-    'New campaign application - ' || coalesce(c.title, 'campaign'),
-    cc,
-    jsonb_build_object(
-      'campaign',  c.title,
-      'client',    coalesce(c.client_name, ''),
-      'creator',   coalesce(p.full_name, ''),
-      'email',     p.email,
-      'handles',   concat_ws(', ',
-                     case when p.tiktok_handle    is not null then 'TikTok @'    || p.tiktok_handle    end,
-                     case when p.instagram_handle is not null then 'Instagram @' || p.instagram_handle end,
-                     case when p.youtube_handle   is not null then 'YouTube @'   || p.youtube_handle   end,
-                     case when p.x_handle         is not null then 'X @'         || p.x_handle         end,
-                     p.handles),
-      'audience',  coalesce(p.audience_size, ''),
-      'interests', array_to_string(p.interests, ', '),
-      'location',  coalesce(p.location, ''),
-      'pitch',     coalesce(new.pitch, '')));
+  plain := format(E'%s applied to %s%s.\n\nHandles: %s\nAudience: %s\nInterests: %s\nLocation: %s\nEmail: %s\n\nPitch:\n%s',
+    coalesce(p.full_name, p.email), c.title,
+    case when c.client_name <> '' then ' for ' || c.client_name else '' end,
+    public.creator_handle_text(p), coalesce(p.audience_size, ''), array_to_string(p.interests, ', '),
+    coalesce(p.location, ''), p.email, coalesce(new.pitch, ''));
+  perform public.send_email(public.notify_address(), public.client_emails(c.client_id),
+    'New application: ' || coalesce(p.full_name, 'a creator') || ' for ' || c.title,
+    public.email_html(public.h(coalesce(p.full_name, 'A creator')) || ' applied to ' || public.h(c.title),
+      '<p>' || replace(public.h(plain), E'\n', '<br>') || '</p>', 'Review applications', public.portal_url()),
+    plain);
   return new;
 exception when others then
-  -- Never block an application because an email failed.
-  raise warning 'notify_new_application failed: %', sqlerrm;
-  return new;
+  raise warning 'notify_new_application failed: %', sqlerrm; return new;
 end; $$;
 
 drop trigger if exists on_application_created on public.applications;
-create trigger on_application_created
-  after insert on public.applications
+create trigger on_application_created after insert on public.applications
   for each row execute function public.notify_new_application();
+
+-- ----- application decided: tell the creator -----
+create or replace function public.notify_application_decided()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare c public.campaigns%rowtype; p public.profiles%rowtype; first text;
+begin
+  if new.status = old.status then return new; end if;
+  select * into c from public.campaigns where id = new.campaign_id;
+  select * into p from public.profiles  where id = new.creator_id;
+  first := split_part(coalesce(p.full_name, ''), ' ', 1);
+  if new.status = 'accepted' then
+    perform public.send_email(p.email, null,
+      'You are on: ' || c.title,
+      public.email_html('You are signed to ' || public.h(c.title) || '.',
+        '<p>' || public.h(coalesce(c.client_name, 'The client')) || ' picked you. Your deliverables are in your portal under '
+        || '<strong>My content</strong>: update the stage as you go and drop the live link in when it posts. '
+        || 'We will be in touch about contract and timing.</p>'
+        || case when c.deadline is not null then '<p>Content deadline: <strong>' || to_char(c.deadline, 'Mon DD, YYYY') || '</strong></p>' else '' end,
+        'Open my content', public.portal_url() || 'dashboard.html'),
+      'You are signed to ' || c.title || '. Sign in at ' || public.portal_url());
+  elsif new.status = 'declined' then
+    perform public.send_email(p.email, null,
+      'Update on ' || c.title,
+      public.email_html('Not this one' || case when first <> '' then ', ' || public.h(first) else '' end || '.',
+        '<p>Thanks for applying to <strong>' || public.h(c.title) || '</strong>. The client went another way on this campaign. '
+        || 'It is not a judgment on your work: briefs are specific, and the next one may fit better. '
+        || 'Keep an eye on the portal.</p>',
+        'See open campaigns', public.portal_url() || 'dashboard.html'),
+      'Thanks for applying to ' || c.title || '. The client went another way this time.');
+  end if;
+  return new;
+exception when others then
+  raise warning 'notify_application_decided failed: %', sqlerrm; return new;
+end; $$;
+
+drop trigger if exists on_application_decided on public.applications;
+create trigger on_application_decided after update of status on public.applications
+  for each row execute function public.notify_application_decided();
+
+-- ----- campaign status: client when it goes live, Bence when submitted -----
+create or replace function public.notify_campaign_status()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare org text := (select name from public.clients where id = new.client_id);
+begin
+  if new.status = old.status then return new; end if;
+  if new.status = 'review' then
+    perform public.send_email(public.notify_address(), null,
+      'Campaign submitted for review: ' || new.title,
+      public.email_html(public.h(new.title) || ' is ready for review',
+        '<p><strong>' || public.h(coalesce(org, new.client_name)) || '</strong> submitted a brief.</p>'
+        || '<p>' || public.h(coalesce(new.summary, '')) || '</p>'
+        || '<p>Budget: ' || public.h(coalesce(new.rate, 'not given')) || '<br>Deadline: '
+        || coalesce(to_char(new.deadline, 'Mon DD, YYYY'), 'not set') || '</p>'
+        || '<p style="white-space:pre-wrap">' || public.h(coalesce(new.brief, '')) || '</p>',
+        'Open in admin', public.portal_url() || 'admin.html'),
+      format(E'%s submitted "%s" for review.\n\n%s', coalesce(org, new.client_name), new.title, coalesce(new.brief, '')));
+  elsif new.status = 'open' and new.client_id is not null then
+    perform public.send_email(public.client_emails(new.client_id), null,
+      'Your campaign is live: ' || new.title,
+      public.email_html(public.h(new.title) || ' is live with creators.',
+        '<p>Approved creators can now see the brief and apply. You will get a copy of each application as it comes in, '
+        || 'and we will line up the right people from there.</p>',
+        'Open the client portal', public.portal_url() || 'client.html'),
+      new.title || ' is now live with creators. Sign in at ' || public.portal_url());
+  end if;
+  return new;
+exception when others then
+  raise warning 'notify_campaign_status failed: %', sqlerrm; return new;
+end; $$;
+
+drop trigger if exists on_campaign_status on public.campaigns;
+create trigger on_campaign_status after update of status on public.campaigns
+  for each row execute function public.notify_campaign_status();
+
+-- ----- content stage: review requests to the client, decisions to the creator -----
+create or replace function public.notify_content_stage()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare c public.campaigns%rowtype; p public.profiles%rowtype; item text;
+begin
+  if new.stage = old.stage then return new; end if;
+  select * into c from public.campaigns where id = new.campaign_id;
+  select * into p from public.profiles  where id = new.creator_id;
+  item := coalesce(new.title, 'A deliverable');
+
+  if new.stage = 'submitted for review' then
+    perform public.send_email(
+      coalesce(public.client_emails(c.client_id), public.notify_address()),
+      case when c.client_id is not null then public.notify_address() end,
+      'Ready for your review: ' || item || ' (' || c.title || ')',
+      public.email_html('Content is waiting for your review.',
+        '<p><strong>' || public.h(coalesce(p.full_name, 'A creator')) || '</strong> submitted <strong>' || public.h(item)
+        || '</strong> for <strong>' || public.h(c.title) || '</strong>.</p>'
+        || case when new.post_url is not null then '<p><a href="' || public.h(new.post_url) || '">' || public.h(new.post_url) || '</a></p>' else '' end
+        || case when new.notes is not null then '<p style="white-space:pre-wrap">' || public.h(new.notes) || '</p>' else '' end
+        || '<p>Approve it, or send it back with a note, from the Content tab.</p>',
+        'Review it', public.portal_url() || 'client.html'),
+      coalesce(p.full_name, 'A creator') || ' submitted ' || item || ' for ' || c.title || '. Review at ' || public.portal_url());
+  elsif new.stage = 'changes requested' then
+    perform public.send_email(p.email, public.notify_address(),
+      'Changes requested: ' || item || ' (' || c.title || ')',
+      public.email_html('A quick revision on ' || public.h(item) || '.',
+        '<p>The client sent <strong>' || public.h(item) || '</strong> for <strong>' || public.h(c.title) || '</strong> back with notes:</p>'
+        || '<p style="white-space:pre-wrap;background:#f4f4f6;padding:12px;border-radius:8px">' || public.h(coalesce(new.notes, '')) || '</p>'
+        || '<p>Make the change, then set the stage back to submitted for review.</p>',
+        'Open my content', public.portal_url() || 'dashboard.html'),
+      'Changes requested on ' || item || ': ' || coalesce(new.notes, ''));
+  elsif new.stage = 'approved' then
+    perform public.send_email(p.email, null,
+      'Approved: ' || item || ' (' || c.title || ')',
+      public.email_html(public.h(item) || ' is approved.',
+        '<p>The client signed off on your <strong>' || public.h(item) || '</strong> for <strong>' || public.h(c.title) || '</strong>. '
+        || 'Schedule it, post it, and paste the live link into your portal so everyone can see it land.</p>',
+        'Open my content', public.portal_url() || 'dashboard.html'),
+      item || ' for ' || c.title || ' is approved. Post it and add the link at ' || public.portal_url());
+  elsif new.stage = 'posted' then
+    perform public.send_email(
+      coalesce(public.client_emails(c.client_id), public.notify_address()),
+      case when c.client_id is not null then public.notify_address() end,
+      'Posted: ' || item || ' (' || c.title || ')',
+      public.email_html(public.h(item) || ' is live.',
+        '<p><strong>' || public.h(coalesce(p.full_name, 'A creator')) || '</strong> posted <strong>' || public.h(item) || '</strong> for <strong>' || public.h(c.title) || '</strong>.</p>'
+        || case when new.post_url is not null then '<p><a href="' || public.h(new.post_url) || '">' || public.h(new.post_url) || '</a></p>' else '' end,
+        'See the campaign', public.portal_url() || 'client.html'),
+      item || ' for ' || c.title || ' is posted. ' || coalesce(new.post_url, ''));
+  end if;
+  return new;
+exception when others then
+  raise warning 'notify_content_stage failed: %', sqlerrm; return new;
+end; $$;
+
+drop trigger if exists on_content_stage on public.content_items;
+create trigger on_content_stage after update of stage on public.content_items
+  for each row execute function public.notify_content_stage();
 
 -- ---------- Row level security ----------------------------------------
 

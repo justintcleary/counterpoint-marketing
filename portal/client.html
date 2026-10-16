@@ -8,7 +8,7 @@
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=6">
+<link rel="stylesheet" href="portal.css?v=7">
 </head>
 <body>
 
@@ -124,9 +124,9 @@
 
 <script type="module">
 import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notice, clearNotice,
-         notifyTeam, GENDERS, LEANINGS, TARGET_GENDERS, TARGET_LEANINGS, optionList,
+         GENDERS, LEANINGS, TARGET_GENDERS, TARGET_LEANINGS, optionList,
          targetChips, stagePill, progressBar, progressOf, campaignStatusLabel, handleLinks,
-         creatorModal, nameLink, interestChips, INTEREST_SUGGESTIONS } from "./app.js?v=6";
+         creatorModal, nameLink, interestChips, INTEREST_SUGGESTIONS } from "./app.js?v=7";
 
 if (requireConfig()) {
   const profile = await guard("client");
@@ -281,14 +281,7 @@ if (requireConfig()) {
       b.disabled = true;
       const { error } = await sb.from("campaigns").update({ status: b.dataset.cstat }).eq("id", b.dataset.id);
       if (error) { alert(error.message); b.disabled = false; return; }
-      if (b.dataset.cstat === "review") {
-        const c = campaigns.find(x => x.id === b.dataset.id);
-        await notifyTeam("Campaign submitted for review - counterpoint.marketing", {
-          organization: org?.name || "", submitted_by: profile.full_name, email: profile.email,
-          campaign: c?.title || "", summary: c?.summary || "", budget: c?.rate || "",
-          deadline: c?.deadline || "", brief: c?.brief || "",
-        });
-      }
+      // Bence is emailed by the on_campaign_status trigger when this goes to review.
       await refresh();
     }));
 
@@ -445,10 +438,7 @@ if (requireConfig()) {
       const stamped = `${fmtDate(new Date())} ${org?.name || "Client"}: ${note}` + (item.notes ? `\n\n${item.notes}` : "");
       const { error } = await sb.from("content_items").update({ stage: "changes requested", notes: stamped }).eq("id", id);
       if (error) { alert(error.message); b.disabled = false; return; }
-      await notifyTeam("Changes requested on content - counterpoint.marketing", {
-        organization: org?.name || "", campaign: item.campaign_title, creator: item.creator_name,
-        content: item.title || "", note,
-      });
+      // The creator and Bence are emailed by the on_content_stage trigger.
       await refresh();
     }));
   }
