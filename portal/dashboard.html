@@ -8,7 +8,7 @@
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=2">
+<link rel="stylesheet" href="portal.css?v=3">
 </head>
 <body>
 
@@ -43,6 +43,7 @@
       <div class="tabs">
         <button class="tab active" data-tab="open">Open campaigns</button>
         <button class="tab" data-tab="mine">My applications</button>
+        <button class="tab" data-tab="content">My content <span id="cntContent" class="muted"></span></button>
         <button class="tab" data-tab="profile">My profile</button>
       </div>
 
@@ -59,6 +60,11 @@
 
       <section id="tab-mine" class="hidden">
         <div id="myApps"></div>
+      </section>
+
+      <section id="tab-content" class="hidden">
+        <p class="muted" style="margin:0 0 14px">Content you owe on campaigns you have been signed to. Update the stage as you go, and drop the live link in once it posts. If the client sends something back, their notes are here.</p>
+        <div id="myContent"></div>
       </section>
 
       <section id="tab-profile" class="hidden">
@@ -116,10 +122,11 @@
 
 <script type="module">
 import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notifyTeam, notice,
-         GENDERS, LEANINGS, optionList, targetChips, matchesTarget } from "./app.js?v=2";
+         GENDERS, LEANINGS, optionList, targetChips, matchesTarget,
+         STAGES, stagePill } from "./app.js?v=3";
 
 if (requireConfig()) {
-  const profile = await guard("any");
+  const profile = await guard("creator");
   if (profile) {
     mountNav(profile, "dashboard");
 
@@ -140,12 +147,15 @@ if (requireConfig()) {
         $$(".tab").forEach(x => x.classList.toggle("active", x.dataset.tab === name));
         $("#tab-open").classList.toggle("hidden", name !== "open");
         $("#tab-mine").classList.toggle("hidden", name !== "mine");
+        $("#tab-content").classList.toggle("hidden", name !== "content");
         $("#tab-profile").classList.toggle("hidden", name !== "profile");
       };
+      await loadContent();
 
       $$(".tab").forEach(t => t.addEventListener("click", async () => {
         openTab(t.dataset.tab);
         if (t.dataset.tab === "mine") await loadMine();
+        if (t.dataset.tab === "content") await loadContent();
       }));
       $("#goProfile").addEventListener("click", () => openTab("profile"));
     }
@@ -221,6 +231,66 @@ if (requireConfig()) {
         niche: profile.niche, pitch,
       });
       await loadCampaigns();
+    }));
+  }
+
+  // Stages a creator moves things through themselves. Approval and change
+  // requests come from the client or counterpoint.
+  const CREATOR_STAGES = ["not started", "drafting", "submitted for review", "scheduled", "posted"];
+
+  async function loadContent() {
+    const box = $("#myContent");
+    const { data } = await sb.from("content_details").select("*")
+      .eq("creator_id", profile.id).order("due_date", { ascending: true, nullsFirst: false });
+    const items = data || [];
+    const flagged = items.filter(i => i.stage === "changes requested").length;
+    $("#cntContent").textContent = flagged ? `(${flagged} to fix)` : "";
+
+    if (!items.length) {
+      box.innerHTML = `<div class="empty">Nothing assigned yet. Once you are signed to a campaign, your deliverables show up here.</div>`;
+      return;
+    }
+    box.innerHTML = items.map(i => {
+      const opts = CREATOR_STAGES.includes(i.stage) ? CREATOR_STAGES : [i.stage, ...CREATOR_STAGES];
+      return `
+      <article class="card">
+        <div class="spread">
+          <div>
+            <h3 style="margin:0 0 4px">${esc(i.title || "Deliverable")}</h3>
+            <div class="muted">${esc(i.campaign_title)}${i.platform ? ` · ${esc(i.platform)}` : ""} · due ${fmtDate(i.due_date)}</div>
+          </div>
+          ${stagePill(i.stage)}
+        </div>
+        ${i.stage === "changes requested" && i.notes ? `<div class="note note-bad" style="margin:12px 0;white-space:pre-wrap">${esc(i.notes)}</div>` : ""}
+        <div class="field-row" style="margin-top:12px">
+          <div class="field">
+            <label for="stage-${i.id}">Stage</label>
+            <select id="stage-${i.id}">${optionList(opts, i.stage)}</select>
+          </div>
+          <div class="field">
+            <label for="url-${i.id}">Link to the post</label>
+            <input id="url-${i.id}" type="url" placeholder="https://" value="${esc(i.post_url || "")}">
+          </div>
+        </div>
+        <div class="field">
+          <label for="notes-${i.id}">Notes for the client and counterpoint</label>
+          <textarea id="notes-${i.id}" rows="2">${esc(i.notes || "")}</textarea>
+        </div>
+        <button class="btn btn-primary btn-sm" data-savec="${i.id}">Save</button>
+      </article>`;
+    }).join("");
+
+    $$("[data-savec]").forEach(b => b.addEventListener("click", async () => {
+      const id = b.dataset.savec;
+      b.disabled = true; b.textContent = "Saving...";
+      const patch = {
+        stage: $("#stage-" + id).value,
+        post_url: $("#url-" + id).value.trim() || null,
+        notes: $("#notes-" + id).value.trim() || null,
+      };
+      const { error } = await sb.from("content_items").update(patch).eq("id", id);
+      if (error) { alert(error.message); b.disabled = false; b.textContent = "Save"; return; }
+      await loadContent();
     }));
   }
 

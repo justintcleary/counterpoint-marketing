@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Creator Portal | counterpoint.marketing</title>
+<title>Portal | counterpoint.marketing</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="icon" href="../favicon.ico" sizes="32x32">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=2">
+<link rel="stylesheet" href="portal.css?v=3">
 </head>
 <body>
 
@@ -26,9 +26,9 @@
 
       <!-- ---------------- sign in ---------------- -->
       <section id="loginView">
-        <p class="kicker">Creator portal</p>
+        <p class="kicker">counterpoint portal</p>
         <h1>Welcome back.</h1>
-        <p class="sub">Sign in to see open campaigns and track your applications.</p>
+        <p class="sub">Creators: see open campaigns and track your work. Clients: brief campaigns, browse creators, and follow content to post.</p>
         <div id="loginNote" class="note hidden"></div>
         <form id="loginForm" class="card">
           <div class="field">
@@ -46,11 +46,19 @@
 
       <!-- ---------------- sign up ---------------- -->
       <section id="signupView" class="hidden">
-        <p class="kicker">Creator portal</p>
+        <p class="kicker">counterpoint portal</p>
         <h1>Apply to join.</h1>
         <p class="sub">Tell us who you are and where you post. We review every application by hand and will email you once you are approved.</p>
         <div id="signupNote" class="note hidden"></div>
         <form id="signupForm" class="card">
+          <div class="segmented" id="accountType" role="radiogroup" aria-label="Account type">
+            <button type="button" class="active" data-type="creator">I'm a creator</button>
+            <button type="button" data-type="client">I'm a brand or organization</button>
+          </div>
+          <div class="field only-client hidden">
+            <label for="suCompany">Organization</label>
+            <input id="suCompany" type="text" placeholder="Company, campaign, or group name">
+          </div>
           <div class="field">
             <label for="suName">Full name</label>
             <input id="suName" type="text" required>
@@ -63,6 +71,7 @@
             <label for="suPass">Password</label>
             <input id="suPass" type="password" autocomplete="new-password" minlength="8" required>
           </div>
+          <div class="only-creator">
           <div class="field">
             <label for="suHandles">Your handles</label>
             <input id="suHandles" type="text" placeholder="@you on TikTok, IG, YouTube" required>
@@ -96,6 +105,7 @@
             <label for="suLeaning">Political leaning</label>
             <select id="suLeaning"><option value="">Select</option></select>
           </div>
+          </div>
           <div class="field">
             <label for="suNotes">Anything else we should know?</label>
             <textarea id="suNotes" rows="3"></textarea>
@@ -109,7 +119,7 @@
       <section id="doneView" class="hidden">
         <p class="kicker">Application received</p>
         <h1>Thanks. We're on it.</h1>
-        <p class="sub">Your application is with our team. We review every creator by hand, and you will get an email as soon as you are approved. Most reviews take a couple of days.</p>
+        <p class="sub">Your request is with our team. We review every account by hand, and you will get an email as soon as you are approved. Most reviews take a couple of days.</p>
         <a class="btn btn-ghost" href="../index.html">Back to the site</a>
       </section>
 
@@ -118,8 +128,8 @@
 </main>
 
 <script type="module">
-import { sb, requireConfig, $, notice, clearNotice, notifyTeam, currentProfile,
-         GENDERS, LEANINGS, optionList } from "./app.js?v=2";
+import { sb, requireConfig, $, $$, notice, clearNotice, notifyTeam, currentProfile, homeFor,
+         GENDERS, LEANINGS, optionList } from "./app.js?v=3";
 
 if (requireConfig()) {
   const loginView = $("#loginView"), signupView = $("#signupView"), doneView = $("#doneView");
@@ -128,12 +138,29 @@ if (requireConfig()) {
   $("#suGender").innerHTML += optionList(GENDERS);
   $("#suLeaning").innerHTML += optionList(LEANINGS);
 
+  // ---- creator vs client signup ----
+  let accountType = "creator";
+  const setType = (type) => {
+    accountType = type;
+    $$("#accountType button").forEach(b => b.classList.toggle("active", b.dataset.type === type));
+    $$(".only-creator").forEach(el => el.classList.toggle("hidden", type !== "creator"));
+    $$(".only-client").forEach(el => el.classList.toggle("hidden", type !== "client"));
+    $("#suHandles").required = type === "creator";
+    $("#suCompany").required = type === "client";
+    $("#signupView h1").textContent = type === "client" ? "Brief us on a campaign." : "Apply to join.";
+    $("#signupView .sub").textContent = type === "client"
+      ? "Create an account for your organization. Once we approve it you can build campaign briefs, browse the creator roster, and track content as it ships."
+      : "Tell us who you are and where you post. We review every application by hand and will email you once you are approved.";
+  };
+  $$("#accountType button").forEach(b => b.addEventListener("click", () => setType(b.dataset.type)));
+  if (location.hash === "#client") { show(signupView); setType("client"); }
+
   $("#toSignup").addEventListener("click", () => show(signupView));
   $("#toLogin").addEventListener("click", () => show(loginView));
   if (location.hash === "#apply") show(signupView);
 
   // already signed in? go straight through
-  currentProfile().then(p => { if (p) location.href = "dashboard.html"; });
+  currentProfile().then(p => { if (p) location.href = homeFor(p); });
 
   // ---- sign in ----
   $("#loginForm").addEventListener("submit", async (e) => {
@@ -145,7 +172,7 @@ if (requireConfig()) {
     });
     btn.disabled = false; btn.textContent = "Sign in";
     if (error) { notice(note, error.message); return; }
-    location.href = "dashboard.html";
+    location.href = homeFor(await currentProfile());
   });
 
   // ---- sign up ----
@@ -155,6 +182,8 @@ if (requireConfig()) {
     const btn = e.target.querySelector("button"); btn.disabled = true; btn.textContent = "Submitting...";
 
     const payload = {
+      account_type: accountType,
+      company: accountType === "client" ? $("#suCompany").value.trim() : "",
       full_name: $("#suName").value.trim(),
       handles: $("#suHandles").value.trim(),
       audience_size: $("#suSize").value.trim(),
@@ -173,7 +202,10 @@ if (requireConfig()) {
     btn.disabled = false; btn.textContent = "Submit application";
     if (error) { notice(note, error.message); return; }
 
-    await notifyTeam("New creator application - counterpoint.marketing", {
+    await notifyTeam(accountType === "client"
+        ? "New client account request - counterpoint.marketing"
+        : "New creator application - counterpoint.marketing", {
+      account_type: accountType, organization: payload.company,
       name: payload.full_name, email,
       handles: payload.handles, audience_size: payload.audience_size,
       niche: payload.niche, location: payload.location,

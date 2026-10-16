@@ -1,5 +1,5 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-import { SUPABASE_URL, SUPABASE_ANON_KEY, NOTIFY_EMAIL } from "./config.js?v=2";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, NOTIFY_EMAIL } from "./config.js?v=3";
 
 export const configured =
   SUPABASE_URL.startsWith("http") && !SUPABASE_ANON_KEY.startsWith("YOUR_");
@@ -42,7 +42,7 @@ export function fmtDate(value) {
 export function statusPill(status) {
   const map = {
     approved: "pill-ok", open: "pill-ok", accepted: "pill-ok",
-    pending: "pill-warn", submitted: "pill-warn", draft: "pill-warn",
+    pending: "pill-warn", submitted: "pill-warn", draft: "pill-warn", review: "pill-lime",
     rejected: "pill-bad", declined: "pill-bad", closed: "pill-bad",
   };
   return `<span class="pill ${map[status] || ""}">${esc(status)}</span>`;
@@ -80,14 +80,25 @@ export async function currentProfile() {
   return data;
 }
 
+// Where each kind of account lands after signing in.
+export function homeFor(profile) {
+  if (!profile) return "index.html";
+  if (profile.role === "admin") return "admin.html";
+  if (profile.role === "client") return "client.html";
+  return "dashboard.html";
+}
+
 // Redirects away if the visitor is not allowed on this page.
-// need: "any" | "approved" | "admin"
+// need: "any" | "creator" | "client" | "admin"
 export async function guard(need = "any") {
   const profile = await currentProfile();
   if (!profile) { location.href = "index.html"; return null; }
-  if (need === "admin" && profile.role !== "admin") {
-    location.href = "dashboard.html"; return null;
-  }
+  const ok =
+    need === "any" ||
+    (need === "admin"   && profile.role === "admin") ||
+    (need === "client"  && profile.role === "client") ||
+    (need === "creator" && profile.role !== "client");
+  if (!ok) { location.href = homeFor(profile); return null; }
   return profile;
 }
 
@@ -99,11 +110,17 @@ export async function signOut() {
 export function mountNav(profile, active) {
   const links = $("#navLinks");
   if (!links) return;
-  const admin = profile?.role === "admin"
-    ? `<a href="admin.html" class="${active === "admin" ? "active" : ""}">Admin</a>` : "";
+  const a = (href, label, key) =>
+    `<a href="${href}" class="${active === key ? "active" : ""}">${label}</a>`;
+  let items = "";
+  if (profile?.role === "client") {
+    items = a("client.html", "Your campaigns", "client");
+  } else {
+    items = a("dashboard.html", "Campaigns", "dashboard");
+    if (profile?.role === "admin") items += a("admin.html", "Admin", "admin");
+  }
   links.innerHTML = `
-    <a href="dashboard.html" class="${active === "dashboard" ? "active" : ""}">Campaigns</a>
-    ${admin}
+    ${items}
     <span class="muted">${esc(profile?.full_name || profile?.email || "")}</span>
     <button id="signOutBtn">Sign out</button>`;
   $("#signOutBtn").addEventListener("click", signOut);
@@ -184,4 +201,47 @@ export function matchesTarget(campaign, profile) {
   const l = campaign.target_leaning;
   if (l && l !== "any" && profile.political_leaning && profile.political_leaning !== l) return false;
   return true;
+}
+
+/* ------------------------------------------------------------------ */
+/* content tracking                                                    */
+/* ------------------------------------------------------------------ */
+
+// Must match content_items_stage_check in schema.sql, in pipeline order.
+export const STAGES = [
+  "not started", "drafting", "submitted for review",
+  "changes requested", "approved", "scheduled", "posted",
+];
+
+export const CAMPAIGN_STATUSES = ["draft", "review", "open", "closed"];
+
+export function stagePill(stage) {
+  const cls = {
+    "not started": "", "drafting": "pill-warn", "submitted for review": "pill-lime",
+    "changes requested": "pill-bad", "approved": "pill-ok", "scheduled": "pill-ok",
+    "posted": "pill-ok",
+  }[stage] || "";
+  return `<span class="pill ${cls}">${esc(stage)}</span>`;
+}
+
+// 0 to 100, how far along a set of content items is.
+export function progressOf(items) {
+  if (!items.length) return 0;
+  const score = (it) => Math.max(0, STAGES.indexOf(it.stage)) / (STAGES.length - 1);
+  return Math.round(items.reduce((sum, it) => sum + score(it), 0) / items.length * 100);
+}
+
+export function progressBar(items) {
+  const pct = progressOf(items);
+  const posted = items.filter(i => i.stage === "posted").length;
+  return `<div class="progress" title="${pct}% complete">
+    <div class="progress-bar" style="width:${pct}%"></div></div>
+    <span class="muted">${posted}/${items.length} posted</span>`;
+}
+
+// Plain-language label for a campaign status, from the client's seat.
+export function campaignStatusLabel(status) {
+  return {
+    draft: "Draft", review: "With counterpoint", open: "Live with creators", closed: "Closed",
+  }[status] || status;
 }

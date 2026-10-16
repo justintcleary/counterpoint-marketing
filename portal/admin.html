@@ -8,7 +8,7 @@
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=2">
+<link rel="stylesheet" href="portal.css?v=3">
 </head>
 <body>
 
@@ -23,12 +23,14 @@
   <div class="wrap">
     <p class="kicker">Admin</p>
     <h1>Manage the portal</h1>
-    <p class="sub">Approve creators, run campaigns, and review every application in one place.</p>
+    <p class="sub">Approve creators and clients, run campaigns, place creators, and keep content moving.</p>
 
     <div class="tabs">
       <button class="tab active" data-tab="creators">Creators <span id="cntCreators" class="muted"></span></button>
-      <button class="tab" data-tab="campaigns">Campaigns</button>
+      <button class="tab" data-tab="clients">Clients <span id="cntClients" class="muted"></span></button>
+      <button class="tab" data-tab="campaigns">Campaigns <span id="cntCampaigns" class="muted"></span></button>
       <button class="tab" data-tab="apps">Applications <span id="cntApps" class="muted"></span></button>
+      <button class="tab" data-tab="content">Content <span id="cntContent" class="muted"></span></button>
     </div>
 
     <!-- ---------------- creators ---------------- -->
@@ -50,22 +52,10 @@
           </div>
         </div>
         <div class="field-row">
-          <div class="field">
-            <label for="fGender">Gender</label>
-            <select id="fGender"><option value="">Any</option></select>
-          </div>
-          <div class="field">
-            <label for="fLeaning">Political leaning</label>
-            <select id="fLeaning"><option value="">Any</option></select>
-          </div>
-          <div class="field">
-            <label for="fAgeMin">Age from</label>
-            <input id="fAgeMin" type="number" min="16" max="100">
-          </div>
-          <div class="field">
-            <label for="fAgeMax">Age to</label>
-            <input id="fAgeMax" type="number" min="16" max="100">
-          </div>
+          <div class="field"><label for="fGender">Gender</label><select id="fGender"><option value="">Any</option></select></div>
+          <div class="field"><label for="fLeaning">Political leaning</label><select id="fLeaning"><option value="">Any</option></select></div>
+          <div class="field"><label for="fAgeMin">Age from</label><input id="fAgeMin" type="number" min="16" max="100"></div>
+          <div class="field"><label for="fAgeMax">Age to</label><input id="fAgeMax" type="number" min="16" max="100"></div>
         </div>
         <div class="row">
           <button class="btn btn-ghost btn-sm" type="button" id="fClear">Clear filters</button>
@@ -73,6 +63,12 @@
         </div>
       </div>
       <div id="creatorsBox"></div>
+    </section>
+
+    <!-- ---------------- clients ---------------- -->
+    <section id="tab-clients" class="hidden">
+      <p class="muted" style="margin:0 0 14px">People who signed up as a brand or organization. Approving them opens the client portal for their organization. Two people from the same organization share one workspace.</p>
+      <div id="clientsBox"></div>
     </section>
 
     <!-- ---------------- campaigns ---------------- -->
@@ -84,8 +80,10 @@
           <input type="hidden" id="cId">
           <div class="field-row">
             <div class="field"><label for="cTitle">Title</label><input id="cTitle" required></div>
-            <div class="field"><label for="cClient">Client</label><input id="cClient" placeholder="Shown to creators"></div>
+            <div class="field"><label for="cOrg">Organization</label>
+              <select id="cOrg"><option value="">None (internal)</option></select></div>
           </div>
+          <div class="field"><label for="cClient">Client name shown to creators</label><input id="cClient" placeholder="Defaults to the organization name"></div>
           <div class="field"><label for="cSummary">Short summary</label><input id="cSummary" placeholder="One line creators see on the card"></div>
           <div class="field"><label for="cBrief">Full brief</label><textarea id="cBrief" rows="5"></textarea></div>
           <div class="field-row">
@@ -113,6 +111,7 @@
           <div class="field"><label for="cStatus">Status</label>
             <select id="cStatus">
               <option value="draft">Draft (hidden from creators)</option>
+              <option value="review">In review (client submitted, not yet live)</option>
               <option value="open">Open (visible, accepting applications)</option>
               <option value="closed">Closed</option>
             </select>
@@ -128,18 +127,41 @@
 
     <!-- ---------------- applications ---------------- -->
     <section id="tab-apps" class="hidden">
+      <p class="muted" style="margin:0 0 14px">Accepting an application signs the creator to the campaign and opens a content tracker for them automatically.</p>
       <div id="appsBox"></div>
+    </section>
+
+    <!-- ---------------- content ---------------- -->
+    <section id="tab-content" class="hidden">
+      <div class="card">
+        <h2>Add a deliverable</h2>
+        <p class="muted" style="margin:0 0 14px">Accepting an application creates the first deliverable for you. Use this when a creator owes more than one piece, or to add someone by hand.</p>
+        <div id="addNote" class="note hidden"></div>
+        <form id="addForm">
+          <div class="field-row">
+            <div class="field"><label for="aCampaign">Campaign</label><select id="aCampaign" required></select></div>
+            <div class="field"><label for="aCreator">Creator</label><select id="aCreator" required></select></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label for="aTitle">Deliverable</label><input id="aTitle" placeholder="1x in-feed video"></div>
+            <div class="field"><label for="aPlatform">Platform</label><input id="aPlatform" placeholder="TikTok"></div>
+          </div>
+          <div class="field"><label for="aDue">Due</label><input id="aDue" type="date"></div>
+          <button class="btn btn-primary btn-sm" type="submit">Add deliverable</button>
+        </form>
+      </div>
+      <div id="contentBox"></div>
     </section>
   </div>
 </main>
 
 <script type="module">
 import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notice, clearNotice,
-         GENDERS, LEANINGS, TARGET_GENDERS, TARGET_LEANINGS, optionList,
-         targetChips } from "./app.js?v=2";
+         GENDERS, LEANINGS, TARGET_GENDERS, TARGET_LEANINGS, optionList, targetChips,
+         STAGES, stagePill, progressBar, progressOf } from "./app.js?v=3";
 
 if (requireConfig()) {
-  let creatorRows = [];
+  let people = [], orgs = [], campaigns = [], content = [];
   const profile = await guard("admin");
   if (profile) {
     mountNav(profile, "admin");
@@ -152,49 +174,48 @@ if (requireConfig()) {
     ["fQ", "fStatus", "fGender", "fLeaning", "fAgeMin", "fAgeMax"].forEach(id =>
       $("#" + id).addEventListener("input", renderCreators));
     $("#fClear").addEventListener("click", () => {
-      ["fQ", "fStatus", "fGender", "fLeaning", "fAgeMin", "fAgeMax"]
-        .forEach(id => { $("#" + id).value = ""; });
+      ["fQ", "fStatus", "fGender", "fLeaning", "fAgeMin", "fAgeMax"].forEach(id => { $("#" + id).value = ""; });
       renderCreators();
     });
 
-    await Promise.all([loadCreators(), loadCampaigns(), loadApps()]);
+    await refreshAll();
 
-    $$(".tab").forEach(t => t.addEventListener("click", () => {
-      $$(".tab").forEach(x => x.classList.toggle("active", x === t));
-      ["creators", "campaigns", "apps"].forEach(name =>
-        $("#tab-" + name).classList.toggle("hidden", name !== t.dataset.tab));
-    }));
+    $$(".tab").forEach(t => t.addEventListener("click", () => showTab(t.dataset.tab)));
+  }
+
+  function showTab(name) {
+    $$(".tab").forEach(x => x.classList.toggle("active", x.dataset.tab === name));
+    ["creators", "clients", "campaigns", "apps", "content"].forEach(n =>
+      $("#tab-" + n).classList.toggle("hidden", n !== name));
+  }
+
+  async function refreshAll() {
+    const [p, o] = await Promise.all([
+      sb.from("profiles").select("*").order("created_at", { ascending: false }),
+      sb.from("clients").select("*").order("name"),
+    ]);
+    people = p.data || []; orgs = o.data || [];
+    $("#cOrg").innerHTML = `<option value="">None (internal)</option>` +
+      orgs.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join("");
+    renderCreators(); renderClients();
+    await Promise.all([loadCampaigns(), loadApps(), loadContent()]);
   }
 
   /* ---------------- creators ---------------- */
-  async function loadCreators() {
-    const { data } = await sb.from("profiles").select("*")
-      .order("created_at", { ascending: false });
-    creatorRows = data || [];
-    const pending = creatorRows.filter(r => r.status === "pending").length;
-    $("#cntCreators").textContent = pending ? `(${pending} pending)` : "";
-    renderCreators();
-  }
-
   // Blank filter means "do not filter on this", so a creator who declined to
   // answer is only excluded when you actively filter on that field.
   function filteredCreators() {
     const q = $("#fQ").value.trim().toLowerCase();
-    const status = $("#fStatus").value;
-    const gender = $("#fGender").value;
-    const leaning = $("#fLeaning").value;
-    const ageMin = Number($("#fAgeMin").value) || null;
-    const ageMax = Number($("#fAgeMax").value) || null;
-
-    return creatorRows.filter(r => {
+    const status = $("#fStatus").value, gender = $("#fGender").value, leaning = $("#fLeaning").value;
+    const ageMin = Number($("#fAgeMin").value) || null, ageMax = Number($("#fAgeMax").value) || null;
+    return people.filter(r => r.role !== "client").filter(r => {
       if (status && r.status !== status) return false;
       if (gender && r.gender !== gender) return false;
       if (leaning && r.political_leaning !== leaning) return false;
       if (ageMin && !(r.age >= ageMin)) return false;
       if (ageMax && !(r.age <= ageMax)) return false;
       if (q) {
-        const hay = [r.full_name, r.email, r.handles, r.niche, r.location, r.notes]
-          .filter(Boolean).join(" ").toLowerCase();
+        const hay = [r.full_name, r.email, r.handles, r.niche, r.location, r.notes].filter(Boolean).join(" ").toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -202,15 +223,15 @@ if (requireConfig()) {
   }
 
   function renderCreators() {
+    const all = people.filter(r => r.role !== "client");
     const rows = filteredCreators();
-    $("#fCount").textContent = creatorRows.length
-      ? `Showing ${rows.length} of ${creatorRows.length} creators`
-      : "";
+    const pending = all.filter(r => r.status === "pending").length;
+    $("#cntCreators").textContent = pending ? `(${pending} pending)` : "";
+    $("#fCount").textContent = all.length ? `Showing ${rows.length} of ${all.length} creators` : "";
 
-    $("#creatorsBox").innerHTML = creatorRows.length === 0
+    $("#creatorsBox").innerHTML = !all.length
       ? `<div class="empty">No creators have signed up yet.</div>`
-      : rows.length === 0
-      ? `<div class="empty">No creators match these filters.</div>`
+      : !rows.length ? `<div class="empty">No creators match these filters.</div>`
       : `<div class="card tight table-wrap"><table>
           <tr><th>Creator</th><th>Audience</th><th>Demographics</th><th>Joined</th><th>Status</th><th></th></tr>
           ${rows.map(r => `<tr>
@@ -232,37 +253,94 @@ if (requireConfig()) {
               ${r.status !== "rejected" ? `<button class="btn btn-danger btn-sm" data-set="rejected" data-id="${r.id}">Reject</button>` : ""}
             </div></td></tr>`).join("")}
         </table></div>`;
+    bindStatusButtons("#creatorsBox");
+  }
 
-    $$("[data-set]").forEach(b => b.addEventListener("click", async () => {
+  function bindStatusButtons(scope) {
+    $$(scope + " [data-set]").forEach(b => b.addEventListener("click", async () => {
       b.disabled = true;
-      const { error } = await sb.from("profiles")
-        .update({ status: b.dataset.set }).eq("id", b.dataset.id);
+      const { error } = await sb.from("profiles").update({ status: b.dataset.set }).eq("id", b.dataset.id);
       if (error) { alert(error.message); b.disabled = false; return; }
-      await loadCreators();
+      await refreshAll();
     }));
+  }
+
+  /* ---------------- clients ---------------- */
+  function renderClients() {
+    const rows = people.filter(r => r.role === "client");
+    const pending = rows.filter(r => r.status === "pending").length;
+    $("#cntClients").textContent = pending ? `(${pending} pending)` : "";
+    const orgName = (id) => orgs.find(o => o.id === id)?.name || "";
+
+    $("#clientsBox").innerHTML = !rows.length
+      ? `<div class="empty">No client accounts yet. Brands sign up at the portal and pick "I'm a brand or organization".</div>`
+      : `<div class="card tight table-wrap"><table>
+          <tr><th>Person</th><th>Organization</th><th>Joined</th><th>Status</th><th></th></tr>
+          ${rows.map(r => `<tr>
+            <td><strong>${esc(r.full_name || "Unnamed")}</strong><br><span class="muted">${esc(r.email)}</span>
+                ${r.notes ? `<br><span class="muted">${esc(r.notes)}</span>` : ""}</td>
+            <td>
+              <select data-org="${r.id}" style="min-width:180px">
+                <option value="">Unassigned</option>
+                ${orgs.map(o => `<option value="${o.id}"${o.id === r.client_id ? " selected" : ""}>${esc(o.name)}</option>`).join("")}
+              </select>
+              ${!r.client_id ? `<div class="faint" style="margin-top:4px;font-size:.8rem">Assign an organization before approving.</div>` : ""}
+            </td>
+            <td class="muted">${fmtDate(r.created_at)}</td>
+            <td>${statusPill(r.status)}</td>
+            <td><div class="row">
+              ${r.status !== "approved" ? `<button class="btn btn-ghost btn-sm" data-set="approved" data-id="${r.id}"${!r.client_id ? " disabled" : ""}>Approve</button>` : ""}
+              ${r.status !== "rejected" ? `<button class="btn btn-danger btn-sm" data-set="rejected" data-id="${r.id}">Reject</button>` : ""}
+            </div></td></tr>`).join("")}
+        </table></div>
+        <div class="card" style="margin-top:14px">
+          <h3 style="margin:0 0 8px">Organizations</h3>
+          <div class="muted" style="margin-bottom:10px">${orgs.length ? orgs.map(o => esc(o.name)).join(" · ") : "None yet."}</div>
+          <div class="row">
+            <input id="newOrg" placeholder="New organization name" style="max-width:320px">
+            <button class="btn btn-ghost btn-sm" type="button" id="addOrg">Add</button>
+          </div>
+        </div>`;
+
+    bindStatusButtons("#clientsBox");
+    $$("[data-org]").forEach(sel => sel.addEventListener("change", async () => {
+      const { error } = await sb.from("profiles").update({ client_id: sel.value || null }).eq("id", sel.dataset.org);
+      if (error) { alert(error.message); return; }
+      await refreshAll();
+    }));
+    $("#addOrg")?.addEventListener("click", async () => {
+      const name = $("#newOrg").value.trim();
+      if (!name) return;
+      const { error } = await sb.from("clients").insert({ name });
+      if (error) { alert(error.message); return; }
+      await refreshAll();
+    });
   }
 
   /* ---------------- campaigns ---------------- */
   async function loadCampaigns() {
-    const { data } = await sb.from("campaigns").select("*")
-      .order("created_at", { ascending: false });
-    const rows = data || [];
+    const { data } = await sb.from("campaigns").select("*").order("created_at", { ascending: false });
+    campaigns = data || [];
+    const review = campaigns.filter(c => c.status === "review").length;
+    $("#cntCampaigns").textContent = review ? `(${review} to review)` : "";
+    const orgName = (id) => orgs.find(o => o.id === id)?.name || "";
 
-    $("#campaignsBox").innerHTML = rows.length === 0
-      ? `<div class="empty">No campaigns yet. Create one above.</div>`
+    $("#campaignsBox").innerHTML = !campaigns.length
+      ? `<div class="empty">No campaigns yet. Create one above, or wait for a client to submit a brief.</div>`
       : `<div class="card tight table-wrap"><table>
           <tr><th>Campaign</th><th>Client</th><th>Looking for</th><th>Deadline</th><th>Status</th><th></th></tr>
-          ${rows.map(c => `<tr>
-            <td><strong>${esc(c.title)}</strong>${c.summary ? `<br><span class="muted">${esc(c.summary)}</span>` : ""}</td>
-            <td class="muted">${esc(c.client_name || "")}</td>
+          ${campaigns.map(c => `<tr>
+            <td><strong>${esc(c.title)}</strong>${c.summary ? `<br><span class="muted">${esc(c.summary)}</span>` : ""}
+                ${c.rate ? `<br><span class="muted">${esc(c.rate)}</span>` : ""}</td>
+            <td class="muted">${esc(c.client_name || "")}${c.client_id ? `<br><span class="faint">${esc(orgName(c.client_id))} (portal)</span>` : ""}</td>
             <td><div class="tags">${targetChips(c)}</div></td>
             <td class="muted">${fmtDate(c.deadline)}</td>
             <td>${statusPill(c.status)}</td>
             <td><div class="row">
               <button class="btn btn-ghost btn-sm" data-match="${c.id}">Find matches</button>
               <button class="btn btn-ghost btn-sm" data-edit="${c.id}">Edit</button>
-              ${c.status !== "open" ? `<button class="btn btn-ghost btn-sm" data-cstat="open" data-id="${c.id}">Open</button>` : ""}
-              ${c.status !== "closed" ? `<button class="btn btn-ghost btn-sm" data-cstat="closed" data-id="${c.id}">Close</button>` : ""}
+              ${c.status !== "open" ? `<button class="btn btn-primary btn-sm" data-cstat="open" data-id="${c.id}">Open</button>` : ""}
+              ${c.status === "open" ? `<button class="btn btn-ghost btn-sm" data-cstat="closed" data-id="${c.id}">Close</button>` : ""}
               <button class="btn btn-danger btn-sm" data-del="${c.id}">Delete</button>
             </div></td></tr>`).join("")}
         </table></div>`;
@@ -274,40 +352,34 @@ if (requireConfig()) {
     }));
 
     $$("[data-del]").forEach(b => b.addEventListener("click", async () => {
-      if (!confirm("Delete this campaign and all of its applications?")) return;
+      if (!confirm("Delete this campaign, its applications, and its content tracker?")) return;
       await sb.from("campaigns").delete().eq("id", b.dataset.del);
-      await Promise.all([loadCampaigns(), loadApps()]);
+      await Promise.all([loadCampaigns(), loadApps(), loadContent()]);
     }));
 
     // Carry a campaign's targeting over to the creator filters.
     $$("[data-match]").forEach(b => b.addEventListener("click", () => {
-      const c = rows.find(x => x.id === b.dataset.match);
-      $("#fQ").value = "";
-      $("#fStatus").value = "approved";
+      const c = campaigns.find(x => x.id === b.dataset.match);
+      $("#fQ").value = ""; $("#fStatus").value = "approved";
       $("#fGender").value = c.target_gender && c.target_gender !== "any" ? c.target_gender : "";
       $("#fLeaning").value = c.target_leaning && c.target_leaning !== "any" ? c.target_leaning : "";
-      $("#fAgeMin").value = c.target_age_min || "";
-      $("#fAgeMax").value = c.target_age_max || "";
-      renderCreators();
-      $$(".tab").forEach(x => x.classList.toggle("active", x.dataset.tab === "creators"));
-      ["creators", "campaigns", "apps"].forEach(name =>
-        $("#tab-" + name).classList.toggle("hidden", name !== "creators"));
+      $("#fAgeMin").value = c.target_age_min || ""; $("#fAgeMax").value = c.target_age_max || "";
+      renderCreators(); showTab("creators");
       window.scrollTo({ top: 0, behavior: "smooth" });
     }));
 
     $$("[data-edit]").forEach(b => b.addEventListener("click", () => {
-      const c = rows.find(x => x.id === b.dataset.edit);
+      const c = campaigns.find(x => x.id === b.dataset.edit);
       $("#cId").value = c.id; $("#cTitle").value = c.title || "";
-      $("#cClient").value = c.client_name || ""; $("#cSummary").value = c.summary || "";
-      $("#cBrief").value = c.brief || ""; $("#cPlatforms").value = c.platforms || "";
-      $("#cDeliverables").value = c.deliverables || ""; $("#cRate").value = c.rate || "";
-      $("#cDeadline").value = c.deadline || ""; $("#cStatus").value = c.status;
+      $("#cOrg").value = c.client_id || ""; $("#cClient").value = c.client_name || "";
+      $("#cSummary").value = c.summary || ""; $("#cBrief").value = c.brief || "";
+      $("#cPlatforms").value = c.platforms || ""; $("#cDeliverables").value = c.deliverables || "";
+      $("#cRate").value = c.rate || ""; $("#cDeadline").value = c.deadline || "";
+      $("#cStatus").value = c.status;
       $("#cTGender").value = c.target_gender || "any";
-      $("#cTAgeMin").value = c.target_age_min || "";
-      $("#cTAgeMax").value = c.target_age_max || "";
+      $("#cTAgeMin").value = c.target_age_min || ""; $("#cTAgeMax").value = c.target_age_max || "";
       $("#cTLeaning").value = c.target_leaning || "any";
-      $("#cTLocation").value = c.target_location || "";
-      $("#cTNiche").value = c.target_niche || "";
+      $("#cTLocation").value = c.target_location || ""; $("#cTNiche").value = c.target_niche || "";
       $("#formTitle").textContent = "Edit campaign";
       $("#campSave").textContent = "Save changes";
       $("#campCancel").classList.remove("hidden");
@@ -327,8 +399,11 @@ if (requireConfig()) {
   $("#campForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const note = $("#campNote"); clearNotice(note);
+    const orgId = $("#cOrg").value || null;
     const payload = {
-      title: $("#cTitle").value.trim(), client_name: $("#cClient").value.trim(),
+      title: $("#cTitle").value.trim(),
+      client_id: orgId,
+      client_name: $("#cClient").value.trim() || orgs.find(o => o.id === orgId)?.name || "",
       summary: $("#cSummary").value.trim(), brief: $("#cBrief").value.trim(),
       platforms: $("#cPlatforms").value.trim(), deliverables: $("#cDeliverables").value.trim(),
       rate: $("#cRate").value.trim(), deadline: $("#cDeadline").value || null,
@@ -336,8 +411,7 @@ if (requireConfig()) {
       target_age_min: $("#cTAgeMin").value ? Number($("#cTAgeMin").value) : null,
       target_age_max: $("#cTAgeMax").value ? Number($("#cTAgeMax").value) : null,
       target_leaning: $("#cTLeaning").value,
-      target_location: $("#cTLocation").value.trim(),
-      target_niche: $("#cTNiche").value.trim(),
+      target_location: $("#cTLocation").value.trim(), target_niche: $("#cTNiche").value.trim(),
       status: $("#cStatus").value,
     };
     const id = $("#cId").value;
@@ -351,13 +425,12 @@ if (requireConfig()) {
 
   /* ---------------- applications ---------------- */
   async function loadApps() {
-    const { data } = await sb.from("application_details").select("*")
-      .order("created_at", { ascending: false });
+    const { data } = await sb.from("application_details").select("*").order("created_at", { ascending: false });
     const rows = data || [];
     const open = rows.filter(r => r.status === "submitted").length;
     $("#cntApps").textContent = open ? `(${open} new)` : "";
 
-    $("#appsBox").innerHTML = rows.length === 0
+    $("#appsBox").innerHTML = !rows.length
       ? `<div class="empty">No applications yet.</div>`
       : `<div class="card tight table-wrap"><table>
           <tr><th>Creator</th><th>Campaign</th><th>Pitch</th><th>Date</th><th>Status</th><th></th></tr>
@@ -378,12 +451,94 @@ if (requireConfig()) {
 
     $$("[data-astat]").forEach(b => b.addEventListener("click", async () => {
       b.disabled = true;
-      const { error } = await sb.from("applications")
-        .update({ status: b.dataset.astat }).eq("id", b.dataset.id);
+      const { error } = await sb.from("applications").update({ status: b.dataset.astat }).eq("id", b.dataset.id);
       if (error) { alert(error.message); b.disabled = false; return; }
-      await loadApps();
+      await Promise.all([loadApps(), loadContent()]);
     }));
   }
+
+  /* ---------------- content ---------------- */
+  async function loadContent() {
+    const { data } = await sb.from("content_details").select("*")
+      .order("campaign_title").order("due_date", { ascending: true, nullsFirst: false });
+    content = data || [];
+    const waiting = content.filter(i => i.stage === "submitted for review").length;
+    $("#cntContent").textContent = waiting ? `(${waiting} in review)` : "";
+
+    $("#aCampaign").innerHTML = campaigns.map(c => `<option value="${c.id}">${esc(c.title)}</option>`).join("");
+    $("#aCreator").innerHTML = people.filter(p => p.role !== "client" && p.status === "approved")
+      .map(p => `<option value="${p.id}">${esc(p.full_name || p.email)}</option>`).join("");
+
+    const box = $("#contentBox");
+    if (!content.length) {
+      box.innerHTML = `<div class="empty">Nothing in production. Accept an application or add a deliverable above.</div>`;
+      return;
+    }
+    const byCampaign = new Map();
+    content.forEach(i => {
+      if (!byCampaign.has(i.campaign_id)) byCampaign.set(i.campaign_id, []);
+      byCampaign.get(i.campaign_id).push(i);
+    });
+    box.innerHTML = [...byCampaign.values()].map(items => `
+      <article class="card">
+        <div class="campaign-head">
+          <h3 style="margin:0">${esc(items[0].campaign_title)}</h3>
+          <span class="muted">${progressOf(items)}% complete</span>
+        </div>
+        <div class="progress-row">${progressBar(items)}</div>
+        ${items.map(i => `
+          <div class="content-item">
+            <div>
+              <div class="field"><label>Deliverable</label><input id="t-${i.id}" value="${esc(i.title || "")}"></div>
+              <div class="muted">${esc(i.creator_name || "")}${i.creator_handles ? ` · ${esc(i.creator_handles)}` : ""}</div>
+            </div>
+            <div>
+              <div class="field"><label>Stage</label><select id="s-${i.id}">${optionList(STAGES, i.stage)}</select></div>
+              <div class="field"><label>Platform</label><input id="p-${i.id}" value="${esc(i.platform || "")}"></div>
+              <div class="field"><label>Due</label><input id="d-${i.id}" type="date" value="${esc(i.due_date || "")}"></div>
+            </div>
+            <div>
+              <div class="field"><label>Post link</label><input id="u-${i.id}" type="url" value="${esc(i.post_url || "")}" placeholder="https://"></div>
+              <div class="field"><label>Notes</label><textarea id="n-${i.id}" rows="2">${esc(i.notes || "")}</textarea></div>
+            </div>
+            <div class="row" style="flex-direction:column;align-items:stretch">
+              ${stagePill(i.stage)}
+              <button class="btn btn-primary btn-sm" data-savec="${i.id}">Save</button>
+              <button class="btn btn-danger btn-sm" data-delc="${i.id}">Remove</button>
+            </div>
+          </div>`).join("")}
+      </article>`).join("");
+
+    $$("[data-savec]").forEach(b => b.addEventListener("click", async () => {
+      const id = b.dataset.savec; b.disabled = true;
+      const patch = {
+        title: $("#t-" + id).value.trim() || null, stage: $("#s-" + id).value,
+        platform: $("#p-" + id).value.trim() || null, due_date: $("#d-" + id).value || null,
+        post_url: $("#u-" + id).value.trim() || null, notes: $("#n-" + id).value.trim() || null,
+      };
+      const { error } = await sb.from("content_items").update(patch).eq("id", id);
+      if (error) { alert(error.message); b.disabled = false; return; }
+      await loadContent();
+    }));
+    $$("[data-delc]").forEach(b => b.addEventListener("click", async () => {
+      if (!confirm("Remove this deliverable?")) return;
+      await sb.from("content_items").delete().eq("id", b.dataset.delc);
+      await loadContent();
+    }));
+  }
+
+  $("#addForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const note = $("#addNote"); clearNotice(note);
+    const { error } = await sb.from("content_items").insert({
+      campaign_id: $("#aCampaign").value, creator_id: $("#aCreator").value,
+      title: $("#aTitle").value.trim() || null, platform: $("#aPlatform").value.trim() || null,
+      due_date: $("#aDue").value || null,
+    });
+    if (error) { notice(note, error.message); return; }
+    notice(note, "Deliverable added.", "ok");
+    $("#addForm").reset(); await loadContent();
+  });
 }
 </script>
 </body>

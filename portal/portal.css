@@ -123,11 +123,46 @@ tr:last-child td{border-bottom:none}
   .targeting .field-row{grid-template-columns:1fr 1fr}
 }
 
+/* ---------- client portal, content tracking ---------- */
+.segmented{display:flex;gap:4px;padding:4px;border:1px solid var(--border);border-radius:999px;
+  background:var(--surface2);margin-bottom:18px}
+.segmented button{flex:1;border:none;background:transparent;color:var(--dim);padding:9px 12px;
+  border-radius:999px;cursor:pointer;font-family:var(--font-display);font-weight:600;font-size:.85rem}
+.segmented button.active{background:var(--lime);color:var(--bg)}
+
+.progress{height:6px;border-radius:999px;background:var(--surface2);border:1px solid var(--border);
+  overflow:hidden;flex:1;min-width:120px}
+.progress-bar{height:100%;background:linear-gradient(90deg,var(--purple),var(--lime));transition:width .3s}
+.progress-row{display:flex;align-items:center;gap:12px;margin:8px 0 14px}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:0 0 22px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.kpi strong{display:block;font-family:var(--font-display);font-size:1.6rem;line-height:1.1;color:var(--text)}
+.kpi span{font-size:.8rem;color:var(--dim)}
+
+.content-item{display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:14px;align-items:start;
+  padding:14px 0;border-top:1px solid var(--border)}
+.content-item:first-child{border-top:none}
+.content-item h4{margin:0 0 4px;font-size:.98rem}
+.content-item .field{margin-bottom:8px}
+.content-item select,.content-item input{padding:8px 10px;font-size:.88rem}
+.content-item textarea{padding:8px 10px;font-size:.88rem;min-height:40px}
+
+.campaign-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.detail-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:6px 18px;
+  margin:10px 0;color:var(--dim);font-size:.9rem}
+.applicant{padding:10px 0;border-top:1px solid var(--border)}
+.applicant:first-child{border-top:none}
+.linklike{color:var(--lime);text-decoration:underline;word-break:break-all}
+
+@media (max-width:860px){ .content-item{grid-template-columns:1fr 1fr} }
+
 @media (max-width:620px){
   .field-row,
   .filters .field-row,
   .filters .field-row:first-child,
   .targeting .field-row{grid-template-columns:1fr}
+  .content-item{grid-template-columns:1fr}
   .wrap{padding:28px 18px 60px}
   .nav-inner{padding:12px 18px}
 }

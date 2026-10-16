@@ -23,7 +23,14 @@ was done, and what is left for you.
 
 ## Left to do
 
-### 1. Make yourselves admins
+### 1. Approve client accounts as they come in
+
+When someone signs up as a brand, they appear under the admin **Clients** tab
+as pending with their organization already attached. Approve them there. If two
+people from one company spelled the name differently, reassign one of them to
+the other organization with the dropdown before approving.
+
+### 2. Make yourselves admins
 
 1. Go to counterpoint.marketing/portal/ and sign up with your work email.
 2. In the Supabase SQL editor, run:
@@ -40,9 +47,10 @@ where email = 'bence@counterpoint.marketing';
 
 Reload the portal and an **Admin** link appears in the top nav.
 
-### 2. Turn on email notifications
+### 3. Turn on email notifications
 
-New signups and campaign applications are emailed to bence@counterpoint.marketing
+New signups, campaign applications, client briefs submitted for review, and
+change requests on content are all emailed to bence@counterpoint.marketing
 through FormSubmit. The very first message triggers a one time confirmation:
 
 1. Have someone sign up through the portal, or submit once yourself.
@@ -54,16 +62,57 @@ still saves to the database either way, so nothing is lost.
 
 ## How it works
 
-- `portal/index.html` is sign in and apply.
-- `portal/dashboard.html` is what creators see. Pending creators see a holding
-  page, approved creators see open campaigns, their applications, and their own
-  profile.
-- `portal/admin.html` is approvals, campaign management, and applications.
-  It is only reachable by accounts with `role = 'admin'`.
+Three kinds of account, all in `profiles.role`:
 
-Campaigns have three states. **Draft** is invisible to creators, **open** is
-visible and accepting applications, **closed** is hidden again. Nothing is shown
-to a creator until you set it to open.
+- **creator** applies to campaigns and delivers content. Lives in
+  `portal/dashboard.html`: open campaigns, their applications, their content
+  tracker, their profile.
+- **client** is a brand or organization. Lives in `portal/client.html`: brief
+  campaigns, see applicants, browse the creator roster, approve or send back
+  content. People sign up as a client by picking "I'm a brand or organization"
+  on the signup page (`portal/#client` opens it directly). Two people who give
+  the same organization name share one workspace.
+- **admin** is counterpoint. `portal/admin.html` approves creators and clients,
+  runs campaigns, places creators, and manages every deliverable.
+
+`portal/index.html` is the shared sign in and sign up page. After signing in,
+everyone is routed to their own page.
+
+### Campaign states
+
+- **draft**: only the owner sees it. A client works on the brief here.
+- **review**: the client submitted it. Counterpoint gets an email, reviews the
+  brief, and sets it to open when creators should see it. Clients cannot open a
+  campaign themselves: who sees a brief and who gets signed is our call.
+- **open**: approved creators can see it and apply.
+- **closed**: finished or withdrawn.
+
+### Content tracking
+
+Accepting an application signs the creator and automatically creates one
+deliverable in `content_items` for them, prefilled from the campaign's
+deliverables, platforms and deadline. Add more by hand from the admin Content
+tab when a creator owes several pieces.
+
+Each deliverable moves through: not started, drafting, submitted for review,
+changes requested, approved, scheduled, posted.
+
+- Creators set the stage themselves (except approved and changes requested),
+  attach the live link, and leave notes.
+- Clients see everything on their campaigns with a progress bar per campaign.
+  When something is submitted for review they can **Approve** or **Request
+  changes** with a note. A change request emails counterpoint and shows up for
+  the creator in red.
+- Admins can edit every field, including stage, on every deliverable.
+
+### What clients can and cannot see
+
+The creator roster is counterpoint's asset. Clients browse approved creators
+with name, niche, audience size, and demographics, but never email addresses,
+and handles only for creators already accepted onto one of their campaigns.
+That is enforced in the database, not just hidden in the page: clients have no
+read access to `profiles` at all and go through the `creator_directory`,
+`client_application_details` and `content_details` views instead.
 
 ## Demographics and campaign targeting
 

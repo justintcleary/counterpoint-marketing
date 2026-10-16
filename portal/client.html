@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Client portal | counterpoint.marketing</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="portal.css?v=3">
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a href="../index.html" class="logo">counterpoint<span>.marketing</span></a>
+    <div class="nav-links" id="navLinks"></div>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap">
+    <div id="pending" class="hidden">
+      <p class="kicker">Account under review</p>
+      <h1>Almost there.</h1>
+      <p class="sub">We are setting up your organization's account. You will get an email the moment it is approved, and your campaign workspace will appear here.</p>
+    </div>
+
+    <div id="rejected" class="hidden">
+      <p class="kicker">Account closed</p>
+      <h1>Not a fit right now.</h1>
+      <p class="sub">We are not able to open an account at this time. If you think that is a mistake, reach out at justin@counterpoint.marketing.</p>
+    </div>
+
+    <div id="approved" class="hidden">
+      <p class="kicker" id="orgName">Client portal</p>
+      <h1 id="greeting">Your campaigns</h1>
+      <p class="sub">Brief a campaign, see who is applying, and watch content move from draft to posted.</p>
+
+      <div class="kpis" id="kpis"></div>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="campaigns">Campaigns</button>
+        <button class="tab" data-tab="creators">Creators</button>
+        <button class="tab" data-tab="content">Content <span id="cntContent" class="muted"></span></button>
+      </div>
+
+      <!-- ---------------- campaigns ---------------- -->
+      <section id="tab-campaigns">
+        <div class="card">
+          <h2 id="formTitle">New campaign brief</h2>
+          <p class="muted" style="margin:0 0 14px">Save as a draft while you work. When it is ready, submit it and we take it from there: sourcing, outreach, and getting creators signed.</p>
+          <div id="campNote" class="note hidden"></div>
+          <form id="campForm">
+            <input type="hidden" id="cId">
+            <div class="field"><label for="cTitle">Campaign name</label><input id="cTitle" required></div>
+            <div class="field"><label for="cSummary">One-line summary</label><input id="cSummary" placeholder="What this campaign is about, in a sentence"></div>
+            <div class="field"><label for="cBrief">Brief</label><textarea id="cBrief" rows="6" placeholder="Goal, key messages, what creators should and should not say, timing, anything else we need to know."></textarea></div>
+            <div class="field-row">
+              <div class="field"><label for="cPlatforms">Platforms</label><input id="cPlatforms" placeholder="TikTok, Instagram, YouTube Shorts"></div>
+              <div class="field"><label for="cDeliverables">Deliverables per creator</label><input id="cDeliverables" placeholder="1x in-feed video, 2x stories"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label for="cRate">Budget</label><input id="cRate" placeholder="Total or per-creator, whichever you know"></div>
+              <div class="field"><label for="cDeadline">Content deadline</label><input id="cDeadline" type="date"></div>
+            </div>
+            <fieldset class="targeting">
+              <legend>Audience you want to reach</legend>
+              <p class="muted" style="margin:0 0 12px">We use this to match creators. Leave anything blank if it does not matter.</p>
+              <div class="field-row">
+                <div class="field"><label for="cTGender">Gender</label><select id="cTGender"></select></div>
+                <div class="field"><label for="cTAgeMin">Age from</label><input id="cTAgeMin" type="number" min="16" max="100"></div>
+                <div class="field"><label for="cTAgeMax">Age to</label><input id="cTAgeMax" type="number" min="16" max="100"></div>
+              </div>
+              <div class="field-row">
+                <div class="field"><label for="cTLeaning">Political leaning</label><select id="cTLeaning"></select></div>
+                <div class="field"><label for="cTLocation">Location</label><input id="cTLocation" placeholder="Michigan, or nationwide"></div>
+                <div class="field"><label for="cTNiche">Niche</label><input id="cTNiche" placeholder="politics, health, sports..."></div>
+              </div>
+            </fieldset>
+            <div class="row">
+              <button class="btn btn-primary" type="submit" id="campSave">Save draft</button>
+              <button class="btn btn-ghost hidden" type="button" id="campCancel">Cancel edit</button>
+            </div>
+          </form>
+        </div>
+        <div id="campaignsBox"></div>
+      </section>
+
+      <!-- ---------------- creators ---------------- -->
+      <section id="tab-creators" class="hidden">
+        <p class="muted" style="margin:0 0 14px">Approved creators in the counterpoint network. Filter to see who fits your audience. Contact details stay with us until a creator is signed to one of your campaigns, so if you want someone specific, name them in your brief.</p>
+        <div class="card tight filters">
+          <div class="field-row">
+            <div class="field"><label for="fQ">Search</label><input id="fQ" type="search" placeholder="Niche, location, name"></div>
+            <div class="field"><label for="fSize">Audience</label><input id="fSize" type="search" placeholder="e.g. 50K"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label for="fGender">Gender</label><select id="fGender"><option value="">Any</option></select></div>
+            <div class="field"><label for="fLeaning">Political leaning</label><select id="fLeaning"><option value="">Any</option></select></div>
+            <div class="field"><label for="fAgeMin">Age from</label><input id="fAgeMin" type="number" min="16" max="100"></div>
+            <div class="field"><label for="fAgeMax">Age to</label><input id="fAgeMax" type="number" min="16" max="100"></div>
+          </div>
+          <div class="row">
+            <button class="btn btn-ghost btn-sm" type="button" id="fClear">Clear filters</button>
+            <span class="muted" id="fCount"></span>
+          </div>
+        </div>
+        <div id="creatorsBox"></div>
+      </section>
+
+      <!-- ---------------- content ---------------- -->
+      <section id="tab-content" class="hidden">
+        <p class="muted" style="margin:0 0 14px">Every piece of content owed on your campaigns, where it is in the pipeline, and the live link once it posts. When something is submitted for review, approve it or send it back with notes.</p>
+        <div id="contentBox"></div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notice, clearNotice,
+         notifyTeam, GENDERS, LEANINGS, TARGET_GENDERS, TARGET_LEANINGS, optionList,
+         targetChips, stagePill, progressBar, progressOf, campaignStatusLabel } from "./app.js?v=3";
+
+if (requireConfig()) {
+  const profile = await guard("client");
+  let org = null, campaigns = [], applications = [], creators = [], content = [];
+
+  if (profile) {
+    mountNav(profile, "client");
+
+    if (profile.status === "pending") $("#pending").classList.remove("hidden");
+    else if (profile.status === "rejected") $("#rejected").classList.remove("hidden");
+    else {
+      $("#approved").classList.remove("hidden");
+      const { data } = await sb.from("clients").select("*").eq("id", profile.client_id).maybeSingle();
+      org = data;
+      if (org) $("#orgName").textContent = org.name;
+
+      $("#cTGender").innerHTML = optionList(TARGET_GENDERS, "any");
+      $("#cTLeaning").innerHTML = optionList(TARGET_LEANINGS, "any");
+      $("#fGender").innerHTML += optionList(GENDERS);
+      $("#fLeaning").innerHTML += optionList(LEANINGS);
+      ["fQ", "fSize", "fGender", "fLeaning", "fAgeMin", "fAgeMax"].forEach(id =>
+        $("#" + id).addEventListener("input", renderCreators));
+      $("#fClear").addEventListener("click", () => {
+        ["fQ", "fSize", "fGender", "fLeaning", "fAgeMin", "fAgeMax"].forEach(id => { $("#" + id).value = ""; });
+        renderCreators();
+      });
+
+      await refresh();
+
+      $$(".tab").forEach(t => t.addEventListener("click", () => {
+        $$(".tab").forEach(x => x.classList.toggle("active", x === t));
+        ["campaigns", "creators", "content"].forEach(name =>
+          $("#tab-" + name).classList.toggle("hidden", name !== t.dataset.tab));
+      }));
+    }
+  }
+
+  async function refresh() {
+    const [c, a, d, ci] = await Promise.all([
+      sb.from("campaigns").select("*").order("created_at", { ascending: false }),
+      sb.from("client_application_details").select("*").order("created_at", { ascending: false }),
+      sb.from("creator_directory").select("*").order("created_at", { ascending: false }),
+      sb.from("content_details").select("*").order("due_date", { ascending: true, nullsFirst: false }),
+    ]);
+    campaigns = c.data || []; applications = a.data || [];
+    creators = d.data || []; content = ci.data || [];
+    renderKpis(); renderCampaigns(); renderCreators(); renderContent();
+  }
+
+  /* ---------------- overview ---------------- */
+  function renderKpis() {
+    const live = campaigns.filter(c => c.status === "open").length;
+    const signed = applications.filter(a => a.status === "accepted").length;
+    const posted = content.filter(i => i.stage === "posted").length;
+    const awaiting = content.filter(i => i.stage === "submitted for review").length;
+    $("#kpis").innerHTML = `
+      <div class="kpi"><strong>${campaigns.length}</strong><span>campaigns</span></div>
+      <div class="kpi"><strong>${live}</strong><span>live with creators</span></div>
+      <div class="kpi"><strong>${signed}</strong><span>creators signed</span></div>
+      <div class="kpi"><strong>${posted}/${content.length}</strong><span>content posted</span></div>
+      <div class="kpi"><strong>${awaiting}</strong><span>awaiting your review</span></div>`;
+    $("#cntContent").textContent = awaiting ? `(${awaiting} to review)` : "";
+  }
+
+  /* ---------------- campaigns ---------------- */
+  function renderCampaigns() {
+    const box = $("#campaignsBox");
+    if (!campaigns.length) {
+      box.innerHTML = `<div class="empty">No campaigns yet. Your first brief goes in the form above.</div>`;
+      return;
+    }
+    box.innerHTML = campaigns.map(c => {
+      const apps = applications.filter(a => a.campaign_id === c.id);
+      const signed = apps.filter(a => a.status === "accepted");
+      const items = content.filter(i => i.campaign_id === c.id);
+      const help = {
+        draft: "Only you can see this. Submit it when the brief is ready.",
+        review: "With counterpoint. We are reviewing the brief and lining up creators.",
+        open: "Live. Approved creators can see it and apply.",
+        closed: "Closed to new applications.",
+      }[c.status];
+      return `
+      <article class="card">
+        <div class="campaign-head">
+          <div>
+            <h3 style="margin:0 0 4px">${esc(c.title)}</h3>
+            ${c.summary ? `<p class="muted" style="margin:0">${esc(c.summary)}</p>` : ""}
+          </div>
+          <div>${statusPill(c.status)} <span class="muted">${esc(campaignStatusLabel(c.status))}</span></div>
+        </div>
+        <p class="muted" style="margin:8px 0 0;font-size:.85rem">${help}</p>
+        <div class="tags"><span class="tags-label">Audience</span>${targetChips(c)}</div>
+        <div class="detail-list">
+          ${c.platforms ? `<div><strong>Platforms:</strong> ${esc(c.platforms)}</div>` : ""}
+          ${c.deliverables ? `<div><strong>Deliverables:</strong> ${esc(c.deliverables)}</div>` : ""}
+          ${c.rate ? `<div><strong>Budget:</strong> ${esc(c.rate)}</div>` : ""}
+          <div><strong>Deadline:</strong> ${fmtDate(c.deadline)}</div>
+        </div>
+        ${items.length ? `<div class="progress-row">${progressBar(items)}</div>` : ""}
+        <div class="row" style="margin-top:10px">
+          ${c.status === "draft" ? `<button class="btn btn-primary btn-sm" data-cstat="review" data-id="${c.id}">Submit to counterpoint</button>` : ""}
+          ${c.status === "review" ? `<button class="btn btn-ghost btn-sm" data-cstat="draft" data-id="${c.id}">Back to draft</button>` : ""}
+          ${c.status !== "open" ? `<button class="btn btn-ghost btn-sm" data-edit="${c.id}">Edit</button>` : ""}
+          ${c.status === "open" || c.status === "review" ? `<button class="btn btn-danger btn-sm" data-cstat="closed" data-id="${c.id}">Close campaign</button>` : ""}
+        </div>
+        ${apps.length ? `
+        <details style="margin-top:14px">
+          <summary class="muted" style="cursor:pointer">${apps.length} applicant${apps.length === 1 ? "" : "s"}, ${signed.length} signed</summary>
+          <div style="margin-top:8px">
+            ${apps.map(a => `
+              <div class="applicant">
+                <div class="spread">
+                  <strong>${esc(a.full_name || "Creator")}</strong>
+                  ${statusPill(a.status)}
+                </div>
+                <div class="muted">${esc([a.audience_size, a.niche, a.location, a.age, a.gender, a.political_leaning].filter(Boolean).join(" / "))}</div>
+                ${a.handles ? `<div class="muted">${esc(a.handles)}</div>` : ""}
+                ${a.pitch ? `<div style="margin-top:4px">${esc(a.pitch)}</div>` : ""}
+              </div>`).join("")}
+          </div>
+        </details>` : ""}
+      </article>`;
+    }).join("");
+
+    $$("[data-cstat]").forEach(b => b.addEventListener("click", async () => {
+      b.disabled = true;
+      const { error } = await sb.from("campaigns").update({ status: b.dataset.cstat }).eq("id", b.dataset.id);
+      if (error) { alert(error.message); b.disabled = false; return; }
+      if (b.dataset.cstat === "review") {
+        const c = campaigns.find(x => x.id === b.dataset.id);
+        await notifyTeam("Campaign submitted for review - counterpoint.marketing", {
+          organization: org?.name || "", submitted_by: profile.full_name, email: profile.email,
+          campaign: c?.title || "", summary: c?.summary || "", budget: c?.rate || "",
+          deadline: c?.deadline || "", brief: c?.brief || "",
+        });
+      }
+      await refresh();
+    }));
+
+    $$("[data-edit]").forEach(b => b.addEventListener("click", () => {
+      const c = campaigns.find(x => x.id === b.dataset.edit);
+      $("#cId").value = c.id; $("#cTitle").value = c.title || "";
+      $("#cSummary").value = c.summary || ""; $("#cBrief").value = c.brief || "";
+      $("#cPlatforms").value = c.platforms || ""; $("#cDeliverables").value = c.deliverables || "";
+      $("#cRate").value = c.rate || ""; $("#cDeadline").value = c.deadline || "";
+      $("#cTGender").value = c.target_gender || "any";
+      $("#cTAgeMin").value = c.target_age_min || ""; $("#cTAgeMax").value = c.target_age_max || "";
+      $("#cTLeaning").value = c.target_leaning || "any";
+      $("#cTLocation").value = c.target_location || ""; $("#cTNiche").value = c.target_niche || "";
+      $("#formTitle").textContent = "Edit campaign";
+      $("#campSave").textContent = "Save changes";
+      $("#campCancel").classList.remove("hidden");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }));
+  }
+
+  function resetForm() {
+    $("#campForm").reset(); $("#cId").value = "";
+    $("#cTGender").value = "any"; $("#cTLeaning").value = "any";
+    $("#formTitle").textContent = "New campaign brief";
+    $("#campSave").textContent = "Save draft";
+    $("#campCancel").classList.add("hidden");
+  }
+  $("#campCancel").addEventListener("click", resetForm);
+
+  $("#campForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const note = $("#campNote"); clearNotice(note);
+    const id = $("#cId").value;
+    const existing = campaigns.find(x => x.id === id);
+    const payload = {
+      title: $("#cTitle").value.trim(), summary: $("#cSummary").value.trim(),
+      brief: $("#cBrief").value.trim(), platforms: $("#cPlatforms").value.trim(),
+      deliverables: $("#cDeliverables").value.trim(), rate: $("#cRate").value.trim(),
+      deadline: $("#cDeadline").value || null,
+      target_gender: $("#cTGender").value,
+      target_age_min: $("#cTAgeMin").value ? Number($("#cTAgeMin").value) : null,
+      target_age_max: $("#cTAgeMax").value ? Number($("#cTAgeMax").value) : null,
+      target_leaning: $("#cTLeaning").value,
+      target_location: $("#cTLocation").value.trim(), target_niche: $("#cTNiche").value.trim(),
+      client_id: profile.client_id, client_name: org?.name || "",
+      status: existing ? existing.status : "draft",
+    };
+    const { error } = id
+      ? await sb.from("campaigns").update(payload).eq("id", id)
+      : await sb.from("campaigns").insert(payload);
+    if (error) { notice(note, error.message); return; }
+    notice(note, id ? "Campaign updated." : "Draft saved. Submit it when you are ready.", "ok");
+    resetForm(); await refresh();
+  });
+
+  /* ---------------- creators ---------------- */
+  function renderCreators() {
+    const q = $("#fQ").value.trim().toLowerCase();
+    const size = $("#fSize").value.trim().toLowerCase();
+    const gender = $("#fGender").value, leaning = $("#fLeaning").value;
+    const ageMin = Number($("#fAgeMin").value) || null, ageMax = Number($("#fAgeMax").value) || null;
+    const rows = creators.filter(r => {
+      if (gender && r.gender !== gender) return false;
+      if (leaning && r.political_leaning !== leaning) return false;
+      if (ageMin && !(r.age >= ageMin)) return false;
+      if (ageMax && !(r.age <= ageMax)) return false;
+      if (size && !(r.audience_size || "").toLowerCase().includes(size)) return false;
+      if (q && ![r.full_name, r.niche, r.location].filter(Boolean).join(" ").toLowerCase().includes(q)) return false;
+      return true;
+    });
+    $("#fCount").textContent = creators.length ? `Showing ${rows.length} of ${creators.length} creators` : "";
+    $("#creatorsBox").innerHTML = !creators.length
+      ? `<div class="empty">The roster is being built. Check back soon.</div>`
+      : !rows.length ? `<div class="empty">No creators match these filters.</div>`
+      : `<div class="grid">${rows.map(r => `
+          <article class="card">
+            <h3 style="margin:0 0 6px">${esc(r.full_name || "Creator")}</h3>
+            <div class="muted">${esc(r.niche || "")}${r.audience_size ? ` · ${esc(r.audience_size)}` : ""}</div>
+            <div class="tags">
+              ${[r.gender, r.age ? r.age + " yrs" : null, r.political_leaning, r.location]
+                .filter(Boolean).map(t => `<span class="tag">${esc(t)}</span>`).join("")}
+            </div>
+          </article>`).join("")}</div>`;
+  }
+
+  /* ---------------- content ---------------- */
+  function renderContent() {
+    const box = $("#contentBox");
+    if (!content.length) {
+      box.innerHTML = `<div class="empty">Nothing in production yet. Content shows up here as soon as a creator is signed to one of your campaigns.</div>`;
+      return;
+    }
+    const byCampaign = new Map();
+    content.forEach(i => {
+      if (!byCampaign.has(i.campaign_id)) byCampaign.set(i.campaign_id, []);
+      byCampaign.get(i.campaign_id).push(i);
+    });
+    box.innerHTML = [...byCampaign.entries()].map(([cid, items]) => `
+      <article class="card">
+        <div class="campaign-head">
+          <h3 style="margin:0">${esc(items[0].campaign_title)}</h3>
+          <span class="muted">${progressOf(items)}% complete</span>
+        </div>
+        <div class="progress-row">${progressBar(items)}</div>
+        ${items.map(i => `
+          <div class="content-item">
+            <div>
+              <h4>${esc(i.title || "Deliverable")}</h4>
+              <div class="muted">${esc(i.creator_name || "")}${i.creator_handles ? ` · ${esc(i.creator_handles)}` : ""}</div>
+              ${i.platform ? `<div class="muted">${esc(i.platform)}</div>` : ""}
+            </div>
+            <div>
+              ${stagePill(i.stage)}
+              <div class="muted" style="margin-top:6px">Due ${fmtDate(i.due_date)}</div>
+              <div class="muted">Updated ${fmtDate(i.updated_at)}</div>
+            </div>
+            <div>
+              ${i.post_url ? `<a class="linklike" href="${esc(i.post_url)}" target="_blank" rel="noopener">${esc(i.post_url)}</a>` : `<span class="faint">No link yet</span>`}
+              ${i.notes ? `<div class="muted" style="margin-top:6px;white-space:pre-wrap">${esc(i.notes)}</div>` : ""}
+            </div>
+            <div>
+              ${i.stage === "submitted for review" ? `
+                <div class="row">
+                  <button class="btn btn-primary btn-sm" data-approve="${i.id}">Approve</button>
+                  <button class="btn btn-ghost btn-sm" data-changes="${i.id}">Request changes</button>
+                </div>
+                <div class="field hidden" id="changes-${i.id}" style="margin-top:8px">
+                  <textarea id="changesNote-${i.id}" rows="3" placeholder="What needs to change?"></textarea>
+                  <button class="btn btn-danger btn-sm" style="margin-top:6px" data-sendchanges="${i.id}">Send back</button>
+                </div>` : ""}
+            </div>
+          </div>`).join("")}
+      </article>`).join("");
+
+    $$("[data-approve]").forEach(b => b.addEventListener("click", async () => {
+      b.disabled = true;
+      const { error } = await sb.from("content_items").update({ stage: "approved" }).eq("id", b.dataset.approve);
+      if (error) { alert(error.message); b.disabled = false; return; }
+      await refresh();
+    }));
+    $$("[data-changes]").forEach(b => b.addEventListener("click", () =>
+      $("#changes-" + b.dataset.changes).classList.remove("hidden")));
+    $$("[data-sendchanges]").forEach(b => b.addEventListener("click", async () => {
+      const id = b.dataset.sendchanges;
+      const item = content.find(i => i.id === id);
+      const note = $("#changesNote-" + id).value.trim();
+      if (!note) { alert("Add a note so the creator knows what to change."); return; }
+      b.disabled = true;
+      const stamped = `${fmtDate(new Date())} ${org?.name || "Client"}: ${note}` + (item.notes ? `\n\n${item.notes}` : "");
+      const { error } = await sb.from("content_items").update({ stage: "changes requested", notes: stamped }).eq("id", id);
+      if (error) { alert(error.message); b.disabled = false; return; }
+      await notifyTeam("Changes requested on content - counterpoint.marketing", {
+        organization: org?.name || "", campaign: item.campaign_title, creator: item.creator_name,
+        content: item.title || "", note,
+      });
+      await refresh();
+    }));
+  }
+}
+</script>
+</body>
+</html>
