@@ -294,3 +294,80 @@ export function handleText(obj) {
   if (obj.handles) bits.push(obj.handles);
   return bits.join(", ");
 }
+
+/* ------------------------------------------------------------------ */
+/* modal + creator profile popup                                       */
+/* ------------------------------------------------------------------ */
+
+export function showModal(html) {
+  closeModal();
+  const wrap = document.createElement("div");
+  wrap.className = "modal-backdrop";
+  wrap.id = "modal";
+  wrap.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
+    <button class="modal-close" aria-label="Close">&times;</button>
+    ${html}</div>`;
+  document.body.appendChild(wrap);
+  document.body.classList.add("modal-open");
+  wrap.addEventListener("click", (e) => { if (e.target === wrap) closeModal(); });
+  wrap.querySelector(".modal-close").addEventListener("click", closeModal);
+  document.addEventListener("keydown", escClose);
+}
+
+export function closeModal() {
+  $("#modal")?.remove();
+  document.body.classList.remove("modal-open");
+  document.removeEventListener("keydown", escClose);
+}
+
+function escClose(e) { if (e.key === "Escape") closeModal(); }
+
+// Everything we know about a creator, from whichever rows the viewer has.
+// p: profile-shaped object (may be a directory row with no email).
+// applications: rows with campaign_title, status, pitch, created_at.
+// content: rows with campaign_title, title, stage, due_date, post_url.
+export function creatorModal(p, { applications = [], content = [], showEmail = false } = {}) {
+  const demo = [
+    p.age ? `${p.age} years old` : null, p.gender, p.political_leaning, p.location,
+  ].filter(Boolean);
+  const row = (label, value) => value
+    ? `<div class="kv"><span>${label}</span><div>${value}</div></div>` : "";
+
+  showModal(`
+    <p class="kicker">${p.role === "client" ? "Client" : "Creator"}</p>
+    <h2 style="margin:0 0 4px">${esc(p.full_name || "Unnamed")}
+      ${p.role === "admin" ? ' <span class="pill pill-lime">admin</span>' : ""}
+      ${p.status ? " " + statusPill(p.status) : ""}</h2>
+    ${showEmail && p.email ? `<p class="muted" style="margin:0 0 12px"><a class="linklike" href="mailto:${esc(p.email)}">${esc(p.email)}</a></p>` : ""}
+    ${handleLinks(p) || '<p class="faint">No handles on file.</p>'}
+    <div class="kv-grid">
+      ${row("Audience", esc(p.audience_size || ""))}
+      ${row("Niche", esc(p.niche || ""))}
+      ${row("Demographics", demo.length ? demo.map(esc).join(" · ") : "")}
+      ${row("Joined", p.created_at ? fmtDate(p.created_at) : "")}
+      ${row("Notes", p.notes ? `<span style="white-space:pre-wrap">${esc(p.notes)}</span>` : "")}
+    </div>
+    ${applications.length ? `
+      <h3 class="modal-h3">Applications</h3>
+      ${applications.map(a => `
+        <div class="applicant">
+          <div class="spread"><strong>${esc(a.campaign_title)}</strong>${statusPill(a.status)}</div>
+          <div class="muted">${fmtDate(a.created_at)}</div>
+          ${a.pitch ? `<div style="margin-top:4px">${esc(a.pitch)}</div>` : ""}
+        </div>`).join("")}` : ""}
+    ${content.length ? `
+      <h3 class="modal-h3">Content</h3>
+      ${content.map(i => `
+        <div class="applicant">
+          <div class="spread"><strong>${esc(i.title || "Deliverable")}</strong>${stagePill(i.stage)}</div>
+          <div class="muted">${esc(i.campaign_title)} · due ${fmtDate(i.due_date)}</div>
+          ${i.post_url ? `<a class="linklike" href="${esc(i.post_url)}" target="_blank" rel="noopener">${esc(i.post_url)}</a>` : ""}
+        </div>`).join("")}` : ""}
+  `);
+}
+
+// Wrap a creator's name so a click opens their profile. Pages listen for
+// [data-person] clicks once, via delegation, so re-rendering is free.
+export function nameLink(id, name) {
+  return `<button type="button" class="namelink" data-person="${esc(id)}">${esc(name || "Unnamed")}</button>`;
+}

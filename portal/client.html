@@ -8,7 +8,7 @@
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=4">
+<link rel="stylesheet" href="portal.css?v=5">
 </head>
 <body>
 
@@ -122,11 +122,36 @@
 <script type="module">
 import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notice, clearNotice,
          notifyTeam, GENDERS, LEANINGS, TARGET_GENDERS, TARGET_LEANINGS, optionList,
-         targetChips, stagePill, progressBar, progressOf, campaignStatusLabel, handleLinks } from "./app.js?v=4";
+         targetChips, stagePill, progressBar, progressOf, campaignStatusLabel, handleLinks,
+         creatorModal, nameLink } from "./app.js?v=5";
 
 if (requireConfig()) {
   const profile = await guard("client");
   let org = null, campaigns = [], applications = [], creators = [], content = [];
+
+  // Any creator name opens their profile, built from whatever this client is
+  // allowed to see: the directory row, their applications, and their content.
+  // Handles only appear once the creator is accepted onto one of our campaigns.
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-person]"); if (!b) return;
+    const id = b.dataset.person;
+    const apps = applications.filter(a => a.creator_id === id);
+    const items = content.filter(i => i.creator_id === id);
+    const src = creators.find(x => x.id === id) || apps[0] || items[0] || {};
+    const accepted = apps.find(a => a.status === "accepted");
+    const person = {
+      id, full_name: src.full_name || src.creator_name, audience_size: src.audience_size,
+      niche: src.niche, location: src.location, age: src.age, gender: src.gender,
+      political_leaning: src.political_leaning, created_at: src.created_at,
+    };
+    const withHandles = accepted || items[0];
+    if (withHandles) {
+      person.handles = withHandles.handles ?? withHandles.creator_handles;
+      ["tiktok_handle", "instagram_handle", "youtube_handle", "x_handle"]
+        .forEach(k => { person[k] = withHandles[k]; });
+    }
+    creatorModal(person, { applications: apps, content: items });
+  });
 
   if (profile) {
     mountNav(profile, "client");
@@ -235,7 +260,7 @@ if (requireConfig()) {
             ${apps.map(a => `
               <div class="applicant">
                 <div class="spread">
-                  <strong>${esc(a.full_name || "Creator")}</strong>
+                  ${nameLink(a.creator_id, a.full_name || "Creator")}
                   ${statusPill(a.status)}
                 </div>
                 <div class="muted">${esc([a.audience_size, a.niche, a.location, a.age, a.gender, a.political_leaning].filter(Boolean).join(" / "))}</div>
@@ -335,7 +360,7 @@ if (requireConfig()) {
       : !rows.length ? `<div class="empty">No creators match these filters.</div>`
       : `<div class="grid">${rows.map(r => `
           <article class="card">
-            <h3 style="margin:0 0 6px">${esc(r.full_name || "Creator")}</h3>
+            <h3 style="margin:0 0 6px">${nameLink(r.id, r.full_name || "Creator")}</h3>
             <div class="muted">${esc(r.niche || "")}${r.audience_size ? ` · ${esc(r.audience_size)}` : ""}</div>
             <div class="tags">
               ${[r.gender, r.age ? r.age + " yrs" : null, r.political_leaning, r.location]
@@ -367,7 +392,7 @@ if (requireConfig()) {
           <div class="content-item">
             <div>
               <h4>${esc(i.title || "Deliverable")}</h4>
-              <div class="muted">${esc(i.creator_name || "")}</div>
+              <div>${nameLink(i.creator_id, i.creator_name)}</div>
               ${handleLinks({ ...i, handles: i.creator_handles })}
               ${i.platform ? `<div class="muted">${esc(i.platform)}</div>` : ""}
             </div>

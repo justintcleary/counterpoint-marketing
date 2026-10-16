@@ -8,7 +8,7 @@
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="portal.css?v=4">
+<link rel="stylesheet" href="portal.css?v=5">
 </head>
 <body>
 
@@ -158,10 +158,22 @@
 <script type="module">
 import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notice, clearNotice,
          GENDERS, LEANINGS, TARGET_GENDERS, TARGET_LEANINGS, optionList, targetChips,
-         STAGES, stagePill, progressBar, progressOf, handleLinks } from "./app.js?v=4";
+         STAGES, stagePill, progressBar, progressOf, handleLinks, creatorModal, nameLink } from "./app.js?v=5";
 
 if (requireConfig()) {
-  let people = [], orgs = [], campaigns = [], content = [];
+  let people = [], orgs = [], campaigns = [], content = [], appRows = [];
+
+  // Any creator or client name opens their full profile.
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-person]"); if (!b) return;
+    const id = b.dataset.person;
+    const person = people.find(x => x.id === id); if (!person) return;
+    creatorModal(person, {
+      applications: appRows.filter(a => a.creator_id === id),
+      content: content.filter(i => i.creator_id === id),
+      showEmail: true,
+    });
+  });
   const profile = await guard("admin");
   if (profile) {
     mountNav(profile, "admin");
@@ -235,7 +247,7 @@ if (requireConfig()) {
       : `<div class="card tight table-wrap"><table>
           <tr><th>Creator</th><th>Audience</th><th>Demographics</th><th>Joined</th><th>Status</th><th></th></tr>
           ${rows.map(r => `<tr>
-            <td><strong>${esc(r.full_name || "Unnamed")}</strong>${r.role === "admin" ? ' <span class="pill pill-lime">admin</span>' : ""}
+            <td>${nameLink(r.id, r.full_name)}${r.role === "admin" ? ' <span class="pill pill-lime">admin</span>' : ""}
                 <br><span class="muted">${esc(r.email)}</span>
                 ${handleLinks(r)}
                 ${r.notes ? `<span class="muted">${esc(r.notes)}</span>` : ""}</td>
@@ -277,7 +289,7 @@ if (requireConfig()) {
       : `<div class="card tight table-wrap"><table>
           <tr><th>Person</th><th>Organization</th><th>Joined</th><th>Status</th><th></th></tr>
           ${rows.map(r => `<tr>
-            <td><strong>${esc(r.full_name || "Unnamed")}</strong><br><span class="muted">${esc(r.email)}</span>
+            <td>${nameLink(r.id, r.full_name)}<br><span class="muted">${esc(r.email)}</span>
                 ${r.notes ? `<br><span class="muted">${esc(r.notes)}</span>` : ""}</td>
             <td>
               <select data-org="${r.id}" style="min-width:180px">
@@ -426,7 +438,7 @@ if (requireConfig()) {
   /* ---------------- applications ---------------- */
   async function loadApps() {
     const { data } = await sb.from("application_details").select("*").order("created_at", { ascending: false });
-    const rows = data || [];
+    const rows = appRows = data || [];
     const open = rows.filter(r => r.status === "submitted").length;
     $("#cntApps").textContent = open ? `(${open} new)` : "";
 
@@ -435,7 +447,7 @@ if (requireConfig()) {
       : `<div class="card tight table-wrap"><table>
           <tr><th>Creator</th><th>Campaign</th><th>Pitch</th><th>Date</th><th>Status</th><th></th></tr>
           ${rows.map(a => `<tr>
-            <td><strong>${esc(a.full_name || "")}</strong><br><span class="muted">${esc(a.email)}</span>
+            <td>${nameLink(a.creator_id, a.full_name)}<br><span class="muted">${esc(a.email)}</span>
                 ${handleLinks(a)}
                 ${a.audience_size ? `<span class="muted">${esc(a.audience_size)}</span>` : ""}
                 <br><span class="muted">${esc([a.age, a.gender, a.political_leaning, a.location].filter(Boolean).join(" / "))}</span></td>
@@ -490,7 +502,7 @@ if (requireConfig()) {
           <div class="content-item">
             <div>
               <div class="field"><label>Deliverable</label><input id="t-${i.id}" value="${esc(i.title || "")}"></div>
-              <div class="muted">${esc(i.creator_name || "")}</div>
+              <div>${nameLink(i.creator_id, i.creator_name)}</div>
               ${handleLinks({ ...i, handles: i.creator_handles })}
             </div>
             <div>
