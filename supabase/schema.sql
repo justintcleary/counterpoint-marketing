@@ -301,6 +301,81 @@ create trigger content_items_touch
   before update on public.content_items
   for each row execute function public.touch_updated_at();
 
+-- ---------- Email when a creator applies ------------------------------
+-- Sent from the database through FormSubmit so the client's addresses never
+-- reach the creator's browser. Goes to Bence, with every approved user of the
+-- campaign's client organization on CC.
+
+create extension if not exists pg_net with schema extensions;
+
+create or replace function public.send_notification(subject text, cc text, fields jsonb)
+returns bigint language plpgsql security definer
+set search_path = public, extensions as $$
+declare
+  payload jsonb := jsonb_build_object('_subject', subject) || coalesce(fields, '{}'::jsonb);
+begin
+  if coalesce(cc, '') <> '' then
+    payload := payload || jsonb_build_object('_cc', cc);
+  end if;
+  return net.http_post(
+    url     := 'https://formsubmit.co/ajax/bence@counterpoint.marketing',
+    body    := payload,
+    -- FormSubmit refuses requests that do not look like they came from a page.
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Accept',       'application/json',
+      'Origin',       'https://counterpoint.marketing',
+      'Referer',      'https://counterpoint.marketing/portal/'));
+end; $$;
+
+revoke all on function public.send_notification(text, text, jsonb) from public;
+
+create or replace function public.notify_new_application()
+returns trigger language plpgsql security definer
+set search_path = public as $$
+declare
+  c   public.campaigns%rowtype;
+  p   public.profiles%rowtype;
+  cc  text;
+begin
+  select * into c from public.campaigns where id = new.campaign_id;
+  select * into p from public.profiles  where id = new.creator_id;
+
+  select string_agg(email, ',') into cc
+  from public.profiles
+  where c.client_id is not null and client_id = c.client_id
+    and role = 'client' and status = 'approved';
+
+  perform public.send_notification(
+    'New campaign application - ' || coalesce(c.title, 'campaign'),
+    cc,
+    jsonb_build_object(
+      'campaign',  c.title,
+      'client',    coalesce(c.client_name, ''),
+      'creator',   coalesce(p.full_name, ''),
+      'email',     p.email,
+      'handles',   concat_ws(', ',
+                     case when p.tiktok_handle    is not null then 'TikTok @'    || p.tiktok_handle    end,
+                     case when p.instagram_handle is not null then 'Instagram @' || p.instagram_handle end,
+                     case when p.youtube_handle   is not null then 'YouTube @'   || p.youtube_handle   end,
+                     case when p.x_handle         is not null then 'X @'         || p.x_handle         end,
+                     p.handles),
+      'audience',  coalesce(p.audience_size, ''),
+      'interests', array_to_string(p.interests, ', '),
+      'location',  coalesce(p.location, ''),
+      'pitch',     coalesce(new.pitch, '')));
+  return new;
+exception when others then
+  -- Never block an application because an email failed.
+  raise warning 'notify_new_application failed: %', sqlerrm;
+  return new;
+end; $$;
+
+drop trigger if exists on_application_created on public.applications;
+create trigger on_application_created
+  after insert on public.applications
+  for each row execute function public.notify_new_application();
+
 -- ---------- Row level security ----------------------------------------
 
 alter table public.clients       enable row level security;

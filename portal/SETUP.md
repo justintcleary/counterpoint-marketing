@@ -49,9 +49,17 @@ Reload the portal and an **Admin** link appears in the top nav.
 
 ### 3. Turn on email notifications
 
-New signups, campaign applications, client briefs submitted for review, and
-change requests on content are all emailed to bence@counterpoint.marketing
-through FormSubmit. The very first message triggers a one time confirmation:
+New signups, client briefs submitted for review, and change requests on
+content are emailed to bence@counterpoint.marketing through FormSubmit from
+the browser.
+
+Campaign applications are different: the `on_application_created` trigger in
+the database sends them through FormSubmit (via `pg_net`) to Bence with every
+approved user of the campaign's client organization on CC. That way the
+client's addresses never reach the creator's browser, and the email goes out
+even if the creator closes the tab. Internal campaigns with no organization
+just go to Bence. If an application ever fails to notify, the application
+still saves; check `net._http_response` in the SQL editor for the reason. The very first message triggers a one time confirmation:
 
 1. Have someone sign up through the portal, or submit once yourself.
 2. Bence gets a FormSubmit confirmation email. He clicks the link.

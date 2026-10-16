@@ -127,7 +127,7 @@
 </main>
 
 <script type="module">
-import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notifyTeam, notice,
+import { sb, requireConfig, guard, mountNav, $, $$, esc, fmtDate, statusPill, notice,
          GENDERS, LEANINGS, optionList, targetChips, matchesTarget,
          STAGES, stagePill, cleanHandle, handleText, mountTagInput } from "./app.js?v=6";
 
@@ -229,13 +229,7 @@ if (requireConfig()) {
         .insert({ campaign_id: id, creator_id: profile.id, pitch });
       if (error) { b.disabled = false; b.textContent = "Submit application"; alert(error.message); return; }
 
-      const campaign = campaigns.find(c => c.id === id);
-      await notifyTeam("New campaign application - counterpoint.marketing", {
-        campaign: campaign?.title || id, client: campaign?.client_name || "",
-        creator: profile.full_name, email: profile.email,
-        handles: handleText(profile), audience_size: profile.audience_size,
-        interests: (profile.interests || []).join(", "), pitch,
-      });
+      // Bence and the client are emailed by the on_application_created trigger.
       await loadCampaigns();
     }));
   }
